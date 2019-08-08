@@ -48,23 +48,33 @@
 package org.knime.core.node;
 
 /**
- * This extension of {@link NodeFactory} is used in order to create a new node
- * in a certain context. Implementors who wish that their nodes can be used in a
- * context (e.g. when a file is dropped onto the workflow editor) should extend
- * this class instead of {@link NodeFactory} and register the factory in the
- * plugin.xml (in addition to the normal registration).
+ * This extension of {@link NodeFactory} is used in order to create a new node in a certain context. Implementors who
+ * wish that their nodes can be used in a context (e.g. when a file is dropped onto the workflow editor) should extend
+ * this class instead of {@link NodeFactory} and register the factory in the plugin.xml (in addition to the normal
+ * registration).
  *
  * @param <T> any subclass of {@link NodeModel}
  * @author Thorsten Meinl, University of Konstanz
  */
-public abstract class ContextAwareNodeFactory<T extends NodeModel> extends
-        NodeFactory<T> {
+public abstract class ContextAwareNodeFactory<T extends NodeModel>
+    extends ConfigurableNodeFactory<T, NodeCreationContext> {
+
+    /**
+     * @since 4.0
+     */
+    @Override
+    protected final T createConfigurableNodeModel(final NodeCreationContext context) {
+        return createNodeModel(context);
+    }
+
     /**
      * Creates a new node model.
      *
      * @param context the context in which the node should be created
      * @return a node model
      */
+    @SuppressWarnings("deprecation")
     @Override
     public abstract T createNodeModel(final NodeCreationContext context);
+
 }

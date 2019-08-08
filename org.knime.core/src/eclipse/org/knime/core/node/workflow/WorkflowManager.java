@@ -127,6 +127,7 @@ import org.knime.core.node.NodeCreationContext;
 import org.knime.core.node.NodeDialogPane;
 import org.knime.core.node.NodeFactory;
 import org.knime.core.node.NodeFactory.NodeType;
+import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeModel;
 import org.knime.core.node.NodeSettings;
@@ -721,6 +722,7 @@ public final class WorkflowManager extends NodeContainer
         return addNodeAndApplyContext(factory, null);
     }
 
+
     /**
      * @param factory ...
      * @param context the context provided by the framework (e.g. the URL of the file that was dragged on the canvas)
@@ -730,8 +732,18 @@ public final class WorkflowManager extends NodeContainer
         return internalAddNewNode(factory, context);
     }
 
+    /**
+     * @param factory ...
+     * @param context the context provided by the framework (e.g. the URL of the file that was dragged on the canvas)
+     * @return the node id of the created node.
+     * @since 4.0
+     */
+    public NodeID addNodeAndApplyContext(final NodeFactory<?> factory, final INodeCreationContext context) {
+        return internalAddNewNode(factory, context);
+    }
+
     @SuppressWarnings("unchecked")
-    private NodeID internalAddNewNode(final NodeFactory<?> factory, final NodeCreationContext context) {
+    private NodeID internalAddNewNode(final NodeFactory<?> factory, final INodeCreationContext context) {
         try (WorkflowLock lock = lock()) {
             // TODO synchronize to avoid messing with running workflows!
             assert factory != null;

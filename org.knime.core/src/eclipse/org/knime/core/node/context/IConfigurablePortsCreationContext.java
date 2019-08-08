@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,37 +41,29 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Aug 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context;
 
-import java.net.URL;
-
-import org.knime.core.node.context.IURLCreationContext;
+import org.knime.core.node.port.PortType;
 
 /**
- * Class storing an URL.
  *
- * @author ohl, University of Konstanz
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.0
  */
-public class NodeCreationContext implements IURLCreationContext {
-
-    private final URL m_url;
+public interface IConfigurablePortsCreationContext extends INodeCreationContext {
 
     /**
-     * Constructor.
-     *
-     * @param url the URL
+     * @return
      */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
-    }
+    public PortType[] getInputPorts();
 
     /**
-     * @return the url
+     * @return
      */
-    @Override
-    public URL getUrl() {
-        return m_url;
-    }
+    public PortType[] getOutputPorts();
 }

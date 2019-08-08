@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,37 +41,36 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Aug 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.node;
 
-import java.net.URL;
+import java.util.Optional;
 
-import org.knime.core.node.context.IURLCreationContext;
+import org.knime.core.node.context.IConfigurablePortsCreationContext;
+import org.knime.core.node.port.PortType;
 
 /**
- * Class storing an URL.
  *
- * @author ohl, University of Konstanz
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @param <T>
+ * @since 4.0
  */
-public class NodeCreationContext implements IURLCreationContext {
+public abstract class ConfigurablePortsNodeFactory<T extends NodeModel>
+    extends ConfigurableNodeFactory<T, IConfigurablePortsCreationContext> {
 
-    private final URL m_url;
+    public abstract boolean configurableInputPorts();
 
-    /**
-     * Constructor.
-     *
-     * @param url the URL
-     */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
-    }
+    public abstract int lockedInputPorts();
 
-    /**
-     * @return the url
-     */
-    @Override
-    public URL getUrl() {
-        return m_url;
-    }
+    public abstract Optional<PortType[]> allowedInputPortTypes();
+
+    public abstract boolean configurableOutputPorts();
+
+    public abstract int lockedOutputPorts();
+
+    public abstract Optional<PortType[]> allowedOutputPortTypes();
 }

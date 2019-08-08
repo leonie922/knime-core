@@ -62,6 +62,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.xmlbeans.XmlException;
 import org.knime.core.node.config.ConfigRO;
 import org.knime.core.node.config.ConfigWO;
+import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.missing.MissingNodeFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -455,11 +456,18 @@ public abstract class NodeFactory<T extends NodeModel> {
      *
      * @param context the node context
      * @return a new {@link NodeModel}
+     * @deprecated
      */
+    @Deprecated
     protected T createNodeModel(final NodeCreationContext context) {
         // normally correct implementations overwrite this
+        return createNodeModel((INodeCreationContext) context);
+    }
+
+    // TODO: do we need protected rather than package?
+    T createNodeModel(@SuppressWarnings("unused") final INodeCreationContext context) {
         m_logger.coding("If you register a node to be created in a certain"
-                + " context, you should extend ContextAwareNodeFactory");
+                + " context, you should extend ConfigurableNodeFactory");
         return createNodeModel();
     }
 
@@ -475,7 +483,7 @@ public abstract class NodeFactory<T extends NodeModel> {
      *
      * @return the model as from createNodeModel()
      */
-    final T callCreateNodeModel(final NodeCreationContext context) {
+    final T callCreateNodeModel(final INodeCreationContext context) {
         T result;
         if (context == null) {
             result = createNodeModel();

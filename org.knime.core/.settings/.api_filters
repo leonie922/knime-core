@@ -417,12 +417,6 @@
                 <message_argument value="putOutputTablesIntoGlobalRepository(HashMap&lt;Integer,ContainerTable&gt;)"/>
             </message_arguments>
         </filter>
-        <filter id="338792546">
-            <message_arguments>
-                <message_argument value="org.knime.core.node.Node"/>
-                <message_argument value="removeOutputTablesFromGlobalRepository(HashMap&lt;Integer,ContainerTable&gt;)"/>
-            </message_arguments>
-        </filter>
     </resource>
     <resource path="src/eclipse/org/knime/core/node/NodeAndBundleInformationPersistor.java" type="org.knime.core.node.NodeAndBundleInformationPersistor">
         <filter id="1141899266">

@@ -79,6 +79,7 @@ import org.knime.core.data.filestore.internal.IFileStoreHandler;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.NodeFactory.NodeType;
+import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.dialog.ValueControlledDialogPane;
 import org.knime.core.node.dialog.ValueControlledNode;
 import org.knime.core.node.interactive.InteractiveNode;
@@ -151,6 +152,8 @@ import org.w3c.dom.Element;
  * passed to the node constructor to create a node of that specific type.
  *
  * @author Thomas Gabriel, University of Konstanz
+ * @noreference This class is not intended to be referenced by clients.
+ * @noinstantiate This class is not intended to be instantiated by clients.
  */
 public final class Node implements NodeModelWarningListener {
 
@@ -260,8 +263,16 @@ public final class Node implements NodeModelWarningListener {
         this(nodeFactory, null);
     }
 
-    public Node(final NodeFactory<NodeModel> nodeFactory,
-            final NodeCreationContext context) {
+    /**
+     * Creates a new node by retrieving the model, dialog, and views, from the specified <code>NodeFactory</code>. Also
+     * initializes the input and output ports for the given number of data and model port. This node is configured after
+     * initialization.
+     *
+     * @param nodeFactory the node's factory for the creation of model, view, and dialog
+     * @param context the node creation context
+     * @throws IllegalArgumentException If the <i>nodeFactory</i> is <code>null</code>.
+     */
+    public Node(final NodeFactory<NodeModel> nodeFactory, final INodeCreationContext context) {
         if (nodeFactory == null) {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
@@ -274,8 +285,7 @@ public final class Node implements NodeModelWarningListener {
         m_inputs = new Input[m_model.getNrInPorts() + 1];
         m_inputs[0] = new Input("Variable Inport", FlowVariablePortObject.TYPE_OPTIONAL);
         for (int i = 1; i < m_inputs.length; i++) {
-            m_inputs[i] = new Input(m_factory.getInportName(i - 1),
-                    m_model.getInPortType(i - 1));
+            m_inputs[i] = new Input(m_factory.getInportName(i - 1), m_model.getInPortType(i - 1));
         }
 
         // create an extra output port (index: 0) for the variables.
