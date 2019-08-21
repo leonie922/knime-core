@@ -127,7 +127,6 @@ import org.knime.core.node.NodeCreationContext;
 import org.knime.core.node.NodeDialogPane;
 import org.knime.core.node.NodeFactory;
 import org.knime.core.node.NodeFactory.NodeType;
-import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeModel;
 import org.knime.core.node.NodeSettings;
@@ -135,6 +134,7 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.NodeView;
 import org.knime.core.node.NotConfigurableException;
+import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.dialog.DialogNode;
 import org.knime.core.node.dialog.DialogNodeValue;
 import org.knime.core.node.dialog.ExternalNodeData;
@@ -736,7 +736,7 @@ public final class WorkflowManager extends NodeContainer
      * @param factory ...
      * @param context the context provided by the framework (e.g. the URL of the file that was dragged on the canvas)
      * @return the node id of the created node.
-     * @since 4.0
+     * @since 4.1
      */
     public NodeID addNodeAndApplyContext(final NodeFactory<?> factory, final INodeCreationContext context) {
         return internalAddNewNode(factory, context);

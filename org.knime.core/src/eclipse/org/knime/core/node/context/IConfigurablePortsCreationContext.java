@@ -48,22 +48,29 @@
  */
 package org.knime.core.node.context;
 
+import java.util.Collection;
+
+import org.knime.core.node.context.configurable.IPortGroupConfiguration;
 import org.knime.core.node.port.PortType;
 
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.0
+ * @since 4.1
  */
 public interface IConfigurablePortsCreationContext extends INodeCreationContext {
 
-    /**
-     * @return
-     */
-    public PortType[] getInputPorts();
+    public Collection<IPortGroupConfiguration> getGroupConfigurations();
 
-    /**
-     * @return
-     */
-    public PortType[] getOutputPorts();
+    default public PortType[][] getInputPorts() {
+        return getGroupConfigurations().stream()
+            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.OUTPUT)
+            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+    }
+
+    default public PortType[][] getOutputPorts() {
+        return getGroupConfigurations().stream()
+            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.INPUT)
+            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+    }
 }

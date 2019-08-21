@@ -53,8 +53,10 @@ import org.knime.core.node.context.INodeCreationContext;
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-abstract class ConfigurableNodeFactory<T extends NodeModel, C extends INodeCreationContext> extends NodeFactory<T> {
+public abstract class ConfigurableNodeFactory<T extends NodeModel, C extends INodeCreationContext>
+    extends NodeFactory<T> {
 
     protected abstract T createConfigurableNodeModel(final C context);
 
@@ -63,7 +65,5 @@ abstract class ConfigurableNodeFactory<T extends NodeModel, C extends INodeCreat
     final T createNodeModel(final INodeCreationContext context) {
         return createConfigurableNodeModel((C)context);
     }
-
-
 
 }

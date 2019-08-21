@@ -60,7 +60,7 @@ public abstract class ContextAwareNodeFactory<T extends NodeModel>
     extends ConfigurableNodeFactory<T, NodeCreationContext> {
 
     /**
-     * @since 4.0
+     * @since 4.1
      */
     @Override
     protected final T createConfigurableNodeModel(final NodeCreationContext context) {

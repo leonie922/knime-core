@@ -46,31 +46,20 @@
  * History
  *   Aug 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.configurable;
 
-import java.util.Optional;
-
+import org.knime.core.node.ConfigurableNodeFactory;
+import org.knime.core.node.NodeModel;
 import org.knime.core.node.context.IConfigurablePortsCreationContext;
-import org.knime.core.node.port.PortType;
 
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @param <T>
- * @since 4.0
+ * @since 4.1
  */
 public abstract class ConfigurablePortsNodeFactory<T extends NodeModel>
     extends ConfigurableNodeFactory<T, IConfigurablePortsCreationContext> {
 
-    public abstract boolean configurableInputPorts();
-
-    public abstract int lockedInputPorts();
-
-    public abstract Optional<PortType[]> allowedInputPortTypes();
-
-    public abstract boolean configurableOutputPorts();
-
-    public abstract int lockedOutputPorts();
-
-    public abstract Optional<PortType[]> allowedOutputPortTypes();
+    public abstract IConfigurablePortsCreationContext createConfigurablePortsCreationContext();
 }

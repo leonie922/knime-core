@@ -51,7 +51,7 @@ package org.knime.core.node.context;
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.0
+ * @since 4.1
  */
 public interface INodeCreationContext {
 

@@ -44,22 +44,57 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Aug 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
+ *   Aug 20, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context;
+package org.knime.core.node.context.configurable;
 
-import java.net.URL;
+
+import java.util.Optional;
+import java.util.function.Predicate;
+
+import org.knime.core.node.port.PortType;
 
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
-public interface IURLCreationContext extends INodeCreationContext {
+public interface IPortGroupConfiguration {
 
-    /**
-     * @return the url
-     */
-    public URL getUrl();
+    public enum PortGroupConfigType {
+
+                    INPUT("input ports"), OUTPUT("output ports"), BOTH("input and output ports");
+
+        private final String m_desc;
+
+        private PortGroupConfigType(final String desc) {
+            m_desc = "Reconfigure " + desc;
+        }
+
+        public String getDescription() {
+            return m_desc;
+        }
+    }
+
+    public enum GroupType {
+            FIXED, SINGLETON, MULTI_INSTANCE;
+    }
+
+    public String getGroupName();
+
+    public String getGroupDescription();
+
+    public Optional<PortType[]> getRequiredPorts();
+
+    public PortGroupConfigType getGroupConfigType();
+
+    public GroupType getGroupType();
+
+    public Predicate<PortType> acceptsPort();
+
+    public PortType[] getConfiguredPorts();
+
+    public void setPorts(final PortType[] ports);
+
 
 }
