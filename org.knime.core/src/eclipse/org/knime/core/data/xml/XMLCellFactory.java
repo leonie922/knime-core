@@ -249,6 +249,7 @@ public class XMLCellFactory implements FromComplexString, FromInputStream {
      * {@inheritDoc}
      * @since 3.0
      */
+    @DataCellFactoryMethod(name = "InputStream (String)")
     @Override
     public DataCell createCell(final InputStream input) throws IOException {
         try {

@@ -50,6 +50,7 @@ package org.knime.core.data.vector.bitvector;
 import java.util.Arrays;
 
 import org.knime.core.data.DataCell;
+import org.knime.core.data.convert.DataCellFactoryMethod;
 
 /**
  *
@@ -400,5 +401,23 @@ public class SparseBitVectorCellFactory implements BitVectorCellFactory<SparseBi
     @Override
     public String toBinaryString() {
         return m_vector.toBinaryString();
+    }
+
+    /**
+     * Creates a new {@link DenseBitVectorCell} from the hex representation in the passed string. Only characters
+     * <code>'0' - '9'</code> and <code>'A' - 'F'</code> are allowed. The character at string position
+     * <code>(length - 1)</code> represents the bits with index 0 to 3 in the vector. The character at position 0
+     * represents the bits with the highest indices. The length of the vector created is the length of the string times
+     * 4 (as each character represents four bits).
+     *
+     * @param hexString containing the hex value to initialize the vector with
+     * @return the {@link DenseBitVectorCell}
+     * @throws IllegalArgumentException if <code>hexString</code> contains characters other then the hex characters
+     *             (i.e. <code>0 - 9, A - F</code>)
+     * @since 4.1
+     */
+    @DataCellFactoryMethod(name = "String (Sparse vector)")
+    public static SparseBitVectorCell createCellFromString(final String hexString) {
+        return new SparseBitVectorCellFactory(hexString).createDataCell();
     }
 }
