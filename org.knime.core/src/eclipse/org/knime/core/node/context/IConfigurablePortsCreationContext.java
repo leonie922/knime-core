@@ -63,14 +63,16 @@ public interface IConfigurablePortsCreationContext extends INodeCreationContext 
     public Collection<IPortGroupConfiguration> getGroupConfigurations();
 
     default public PortType[][] getInputPorts() {
-        return getGroupConfigurations().stream()
-            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.OUTPUT)
-            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+        return null;
+//        return getGroupConfigurations().stream()
+//            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.OUTPUT)
+//            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
     }
 
     default public PortType[][] getOutputPorts() {
-        return getGroupConfigurations().stream()
-            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.INPUT)
-            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+        return null;
+//        return getGroupConfigurations().stream()
+//            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.INPUT)
+//            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
     }
 }
