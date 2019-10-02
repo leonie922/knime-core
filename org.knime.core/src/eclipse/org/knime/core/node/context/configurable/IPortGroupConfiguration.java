@@ -62,7 +62,7 @@ import org.knime.core.node.port.PortType;
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
-public interface IPortGroupConfiguration {
+public interface IPortGroupConfiguration<C extends IPortGroupConfiguration<C>> {
 
     public void save(final NodeSettingsWO settings);
 
@@ -93,4 +93,5 @@ public interface IPortGroupConfiguration {
 
     public void removePort(final int idx);
 
+    public C cloneIt();
 }

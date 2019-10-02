@@ -743,7 +743,7 @@ public final class WorkflowManager extends NodeContainer
     }
 
     @SuppressWarnings("unchecked")
-    private NodeID internalAddNewNode(final NodeFactory<?> factory, final INodeCreationContext context) {
+    private NodeID internalAddNewNode(final NodeFactory<?> factory, final INodeCreationContext<?> context) {
         try (WorkflowLock lock = lock()) {
             // TODO synchronize to avoid messing with running workflows!
             assert factory != null;

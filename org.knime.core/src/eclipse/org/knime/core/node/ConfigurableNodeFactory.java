@@ -58,8 +58,6 @@ import org.knime.core.node.context.INodeCreationContext;
 public abstract class ConfigurableNodeFactory<T extends NodeModel, C extends INodeCreationContext>
     extends NodeFactory<T> {
 
-    public abstract C createCreationContext();
-
     protected abstract T createConfigurableNodeModel(final C context);
 
     @SuppressWarnings("unchecked")

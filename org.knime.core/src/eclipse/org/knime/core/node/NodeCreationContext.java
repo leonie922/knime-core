@@ -54,7 +54,7 @@ import org.knime.core.node.context.IURLCreationContext;
  *
  * @author ohl, University of Konstanz
  */
-public class NodeCreationContext implements IURLCreationContext {
+public class NodeCreationContext implements IURLCreationContext<NodeCreationContext> {
 
     private URL m_url;
 
@@ -101,5 +101,13 @@ public class NodeCreationContext implements IURLCreationContext {
                     "The value " + settings.getString("url") + " does not encode a valid URL", ex.getCause());
             }
         }
+    }
+
+    /**
+     * @since 4.1
+     */
+    @Override
+    public NodeCreationContext cloneIt() {
+        return new NodeCreationContext(m_url);
     }
 }

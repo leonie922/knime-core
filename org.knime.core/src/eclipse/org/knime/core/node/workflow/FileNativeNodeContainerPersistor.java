@@ -63,7 +63,6 @@ import org.knime.core.eclipseUtil.GlobalClassCreator;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.ConfigurableNodeFactory;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.FileNodePersistor;
 import org.knime.core.node.InvalidSettingsException;
@@ -78,6 +77,7 @@ import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.context.INodeCreationContext;
+import org.knime.core.node.context.configurable.ConfigurablePortsNodeFactory;
 import org.knime.core.node.missing.MissingNodeFactory;
 import org.knime.core.node.port.PortObject;
 import org.knime.core.node.port.PortType;
@@ -367,8 +367,10 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
     private static Optional<INodeCreationContext> loadCreationContext(final NodeSettingsRO settings,
         final NodeFactory<?> factory) throws InvalidSettingsException {
         if (settings.containsKey(NODE_CREATION_CONTEXT)) {
+            // TODO: the cast is to specific ... however moving the method to it's super-class causes problems with
+            // the URL shit
             final INodeCreationContext creationContext =
-                ((ConfigurableNodeFactory<?, ?>)factory).createCreationContext();
+                ((ConfigurablePortsNodeFactory<?>)factory).createCreationContext();
             try {
             creationContext.load(settings.getNodeSettings(NODE_CREATION_CONTEXT));
             } catch(final InvalidSettingsException e) {

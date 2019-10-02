@@ -81,6 +81,7 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.NodeFactory.NodeType;
 import org.knime.core.node.context.INodeCreationContext;
+import org.knime.core.node.context.configurable.ConfigurablePortsNodeFactory;
 import org.knime.core.node.dialog.ValueControlledDialogPane;
 import org.knime.core.node.dialog.ValueControlledNode;
 import org.knime.core.node.interactive.InteractiveNode;
@@ -134,23 +135,19 @@ import org.knime.core.util.FileUtil;
 import org.w3c.dom.Element;
 
 /**
- * Implementation of a node as basic processing unit within the workflow. A Node
- * object is the place where the data flow starts, ends, or intersects. Thus a
- * Node can be connected with predecessors and successors through its input and
- * output ports, {@link org.knime.core.node.workflow.NodeInPort} and
- * {@link org.knime.core.node.workflow.NodeOutPort}, respectively. There are
- * data ports for exchanging data tables, and prediction model ports for
- * transferring computed data models. <br>
- * A node must contain a {@link NodeModel} and may contain {@link NodeView}s
- * and a {@link NodeDialogPane} implementing the Model-View-Controller paradigm.
- * The node manages the interactions between these components and handles all
- * internal and external data flows. Incoming data is passed to the
- * {@link NodeModel} and forwarded from there to the node's ports. <br>
- * The <code>Node</code> is the part within a workflow holding and managing
- * the user specific {@link NodeModel}, {@link NodeDialogPane}, and possibly
- * {@link NodeView}, thus, it is not intended to extend this class. A
- * {@link NodeFactory} is used to bundle model, view and dialog. This factory is
- * passed to the node constructor to create a node of that specific type.
+ * Implementation of a node as basic processing unit within the workflow. A Node object is the place where the data flow
+ * starts, ends, or intersects. Thus a Node can be connected with predecessors and successors through its input and
+ * output ports, {@link org.knime.core.node.workflow.NodeInPort} and {@link org.knime.core.node.workflow.NodeOutPort},
+ * respectively. There are data ports for exchanging data tables, and prediction model ports for transferring computed
+ * data models. <br>
+ * A node must contain a {@link NodeModel} and may contain {@link NodeView}s and a {@link NodeDialogPane} implementing
+ * the Model-View-Controller paradigm. The node manages the interactions between these components and handles all
+ * internal and external data flows. Incoming data is passed to the {@link NodeModel} and forwarded from there to the
+ * node's ports. <br>
+ * The <code>Node</code> is the part within a workflow holding and managing the user specific {@link NodeModel},
+ * {@link NodeDialogPane}, and possibly {@link NodeView}, thus, it is not intended to extend this class. A
+ * {@link NodeFactory} is used to bundle model, view and dialog. This factory is passed to the node constructor to
+ * create a node of that specific type.
  *
  * @author Thomas Gabriel, University of Konstanz
  * @noreference This class is not intended to be referenced by clients.
@@ -158,7 +155,9 @@ import org.w3c.dom.Element;
  */
 public final class Node implements NodeModelWarningListener {
 
-    /** Text prepended to message on node execution failure.
+    /**
+     * Text prepended to message on node execution failure.
+     *
      * @noreference This field is not intended to be referenced by clients.
      * @since 4.0
      */
@@ -168,18 +167,24 @@ public final class Node implements NodeModelWarningListener {
     private static final NodeLogger LOGGER = NodeLogger.getLogger(Node.class);
 
     /**
-     * Config for node (and node container) settings which are shown in the
-     * dialog.
+     * Config for node (and node container) settings which are shown in the dialog.
      */
     public static final String CFG_MISC_SETTINGS = "internal_node_subsettings";
 
-    /** The sub settings entry where the model can save its setup.
-     * @deprecated Clients should not be required to understand model internals. */
+    /**
+     * The sub settings entry where the model can save its setup.
+     *
+     * @deprecated Clients should not be required to understand model internals.
+     */
     @Deprecated
     public static final String CFG_MODEL = "model";
-    /** The sub settings entry containing the flow variable settings. These
-     * settings are not available in the derived node model.
-     * @deprecated Clients should not be required to understand model internals. */
+
+    /**
+     * The sub settings entry containing the flow variable settings. These settings are not available in the derived
+     * node model.
+     *
+     * @deprecated Clients should not be required to understand model internals.
+     */
     @Deprecated
     public static final String CFG_VARIABLES = "variables";
 
@@ -200,12 +205,18 @@ public final class Node implements NodeModelWarningListener {
     /** Keeps outgoing information (specs, objects, HiLiteHandlers...). */
     static class Output {
         String name;
+
         PortType type;
+
         PortObjectSpec spec;
+
         PortObject object;
+
         HiLiteHandler hiliteHdl;
+
         String summary;
     }
+
     private final Output[] m_outputs;
 
     /** Keeps information about incoming connectors (type and name). */
@@ -214,33 +225,42 @@ public final class Node implements NodeModelWarningListener {
             m_name = n;
             m_type = t;
         }
+
         private final String m_name;
+
         private final PortType m_type;
-        public String getName() { return m_name; }
-        public PortType getType() { return m_type; }
+
+        public String getName() {
+            return m_name;
+        }
+
+        public PortType getType() {
+            return m_type;
+        }
     }
+
     private final Input[] m_inputs;
 
-    /** The array of PortObjects held internally by the NodeModel (also after save/load). Only set when model
-     * implements {@link BufferedDataTableHolder} or {@link PortObjectHolder}. In most cases this is null. */
+    /**
+     * The array of PortObjects held internally by the NodeModel (also after save/load). Only set when model implements
+     * {@link BufferedDataTableHolder} or {@link PortObjectHolder}. In most cases this is null.
+     */
     private PortObject[] m_internalHeldPortObjects;
 
     /** The listeners that are interested in node state changes. */
     private final CopyOnWriteArraySet<NodeMessageListener> m_messageListeners;
 
     /**
-     * Contains the set of tables that have been created during the execute
-     * using the ExecutionContext. This set does not contain the outport tables.
-     * For a threaded node (chunk-wise processing), this set will contain the
-     * temporary chunk containers. Ideally, we will clear theses tables when the
-     * execution finishes but some implementations (for instance a scatterplot,
-     * scorer) do create tables that they keep a reference on (for displaying in
-     * the view).
+     * Contains the set of tables that have been created during the execute using the ExecutionContext. This set does
+     * not contain the outport tables. For a threaded node (chunk-wise processing), this set will contain the temporary
+     * chunk containers. Ideally, we will clear theses tables when the execution finishes but some implementations (for
+     * instance a scatterplot, scorer) do create tables that they keep a reference on (for displaying in the view).
      */
     private final Set<ContainerTable> m_localTempTables;
 
-    /** File store handler that is non null during and after execution.
-     * Set null on reset. */
+    /**
+     * File store handler that is non null during and after execution. Set null on reset.
+     */
     private IFileStoreHandler m_fileStoreHandler;
 
     // lock that prevents a possible deadlock if a node is currently configuring
@@ -249,18 +269,15 @@ public final class Node implements NodeModelWarningListener {
     // cases then
     private final Object m_configureLock = new Object();
 
-    private final INodeCreationContext m_context;
+    private final INodeCreationContext<?> m_context;
 
     /**
-     * Creates a new node by retrieving the model, dialog, and views, from the
-     * specified <code>NodeFactory</code>. Also initializes the input and output
-     * ports for the given number of data and model port. This node is
-     * configured after initialization.
+     * Creates a new node by retrieving the model, dialog, and views, from the specified <code>NodeFactory</code>. Also
+     * initializes the input and output ports for the given number of data and model port. This node is configured after
+     * initialization.
      *
-     * @param nodeFactory the node's factory for the creation of model, view,
-     *            and dialog
-     * @throws IllegalArgumentException If the <i>nodeFactory</i> is
-     *             <code>null</code>.
+     * @param nodeFactory the node's factory for the creation of model, view, and dialog
+     * @throws IllegalArgumentException If the <i>nodeFactory</i> is <code>null</code>.
      */
     public Node(final NodeFactory<NodeModel> nodeFactory) {
         this(nodeFactory, null);
@@ -275,7 +292,7 @@ public final class Node implements NodeModelWarningListener {
      * @param context the node creation context
      * @throws IllegalArgumentException If the <i>nodeFactory</i> is <code>null</code>.
      */
-    public Node(final NodeFactory<NodeModel> nodeFactory, final INodeCreationContext context) {
+    public Node(final NodeFactory<NodeModel> nodeFactory, final INodeCreationContext<?> context) {
         if (nodeFactory == null) {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
@@ -314,42 +331,43 @@ public final class Node implements NodeModelWarningListener {
         setForceSynchronousIO(false); // may set to true if this is a loop end
     }
 
-    /** Create a persistor that is used to paste a copy of this node into the same or a different workflow.
-     * (Used by copy&amp;paste actions and undo operations)
+    /**
+     * Create a persistor that is used to paste a copy of this node into the same or a different workflow. (Used by
+     * copy&amp;paste actions and undo operations)
+     *
      * @return A new copy persistor (which doesn't copy anything as settings are taken care of by the SNC class).
      */
     public CopyNodePersistor createCopyPersistor() {
         return new CopyNodePersistor();
     }
 
-    /** Load settings and data + internals from a loader instance.
+    /**
+     * Load settings and data + internals from a loader instance.
+     *
      * @param loader To load from
      * @param exec For progress information/cancelation
      * @param loadResult Where to report errors/warnings to
      * @throws CanceledExecutionException If canceled.
      * @noreference This method is not intended to be referenced by clients.
      */
-    public void load(final NodePersistor loader, final ExecutionMonitor exec,
-            final LoadResult loadResult) throws CanceledExecutionException {
+    public void load(final NodePersistor loader, final ExecutionMonitor exec, final LoadResult loadResult)
+        throws CanceledExecutionException {
         m_fileStoreHandler = loader.getFileStoreHandler();
         loadDataAndInternals(loader, exec, loadResult);
         exec.setProgress(1.0);
     }
 
-
     /**
-     * Creates an execution result containing all calculated values in a
-     * execution. The returned value is suitable to be used in
-     * {@link #loadDataAndInternals(
-     * NodeContentPersistor, ExecutionMonitor, LoadResult)}.
-     * If this node is not executed, it will assign null values to the fields
-     * in the returned execution result.
+     * Creates an execution result containing all calculated values in a execution. The returned value is suitable to be
+     * used in {@link #loadDataAndInternals( NodeContentPersistor, ExecutionMonitor, LoadResult)}. If this node is not
+     * executed, it will assign null values to the fields in the returned execution result.
+     *
      * @param exec For progress information.
      * @return A new execution result containing the values being calculated.
      * @throws CanceledExecutionException If canceled
      */
-    public NodeExecutionResult createNodeExecutionResult(
-            final ExecutionMonitor exec) throws CanceledExecutionException {
+    public NodeExecutionResult createNodeExecutionResult(final ExecutionMonitor exec)
+        throws CanceledExecutionException {
         NodeExecutionResult result = new NodeExecutionResult();
         result.setWarningMessage(m_model.getWarningMessage());
         if (hasContent()) {
@@ -365,7 +383,7 @@ public final class Node implements NodeModelWarningListener {
         }
         if (m_internalHeldPortObjects != null) {
             PortObject[] internalHeldPortObjects =
-                    Arrays.copyOf(m_internalHeldPortObjects, m_internalHeldPortObjects.length);
+                Arrays.copyOf(m_internalHeldPortObjects, m_internalHeldPortObjects.length);
             result.setInternalHeldPortObjects(internalHeldPortObjects);
         }
         PortObject[] pos = new PortObject[getNrOutPorts()];
@@ -383,8 +401,8 @@ public final class Node implements NodeModelWarningListener {
         // Add the outgoing flow variables to the execution result
         FlowObjectStack outgoingStack = m_model.getOutgoingFlowObjectStack();
 
-        List<FlowVariable> nodeFlowVars = outgoingStack.getAvailableFlowVariables().values()
-            .stream().filter(f -> f.getScope().equals(FlowVariable.Scope.Flow)).collect(Collectors.toList());
+        List<FlowVariable> nodeFlowVars = outgoingStack.getAvailableFlowVariables().values().stream()
+            .filter(f -> f.getScope().equals(FlowVariable.Scope.Flow)).collect(Collectors.toList());
         Collections.reverse(nodeFlowVars); // the bottom most element should remain at the bottom of the stack
 
         result.setFlowVariables(nodeFlowVars);
@@ -407,52 +425,52 @@ public final class Node implements NodeModelWarningListener {
         return result;
     }
 
-    /** Check class of the spec instance.
+    /**
+     * Check class of the spec instance.
+     *
      * @param spec The spec
      * @param portIdx the port
-     * @return <code>true</code> if the spec is valid (null, correct class
-     *         or inactive port object spec)
+     * @return <code>true</code> if the spec is valid (null, correct class or inactive port object spec)
      */
-    private boolean checkPortObjectSpecClass(
-            final PortObjectSpec spec, final int portIdx) {
+    private boolean checkPortObjectSpecClass(final PortObjectSpec spec, final int portIdx) {
         if (spec == null) {
             return true;
         } else if (spec instanceof InactiveBranchPortObjectSpec) {
             return true;
         } else {
-            Class<? extends PortObjectSpec> specClass =
-                m_outputs[portIdx].type.getPortObjectSpecClass();
+            Class<? extends PortObjectSpec> specClass = m_outputs[portIdx].type.getPortObjectSpecClass();
             return specClass.isInstance(spec);
         }
     }
 
-    /** Check class of the object instance.
+    /**
+     * Check class of the object instance.
+     *
      * @param spec The port object
      * @param portIdx the port
-     * @return <code>true</code> if the object is valid (null, correct class
-     *         or inactive port object)
+     * @return <code>true</code> if the object is valid (null, correct class or inactive port object)
      */
-    private boolean checkPortObjectClass(
-            final PortObject obj, final int portIdx) {
+    private boolean checkPortObjectClass(final PortObject obj, final int portIdx) {
         if (obj == null) {
             return true;
         } else if (obj instanceof InactiveBranchPortObject) {
             return true;
         } else {
-            Class<? extends PortObject> objClass =
-                m_outputs[portIdx].type.getPortObjectClass();
+            Class<? extends PortObject> objClass = m_outputs[portIdx].type.getPortObjectClass();
             return objClass.isInstance(obj);
         }
     }
 
-    /** Loads data from an argument persistor.
+    /**
+     * Loads data from an argument persistor.
+     *
      * @param loader To load from.
      * @param exec For progress.
      * @param loadResult to add errors and warnings to (if any)
      * @noreference This method is not intended to be referenced by clients.
      */
-    public void loadDataAndInternals(final NodeContentPersistor loader,
-            final ExecutionMonitor exec, final LoadResult loadResult) {
+    public void loadDataAndInternals(final NodeContentPersistor loader, final ExecutionMonitor exec,
+        final LoadResult loadResult) {
         LOGGER.assertLog(NodeContext.getContext() != null,
             "No node context available, please check call hierarchy and fix it");
 
@@ -463,11 +481,9 @@ public final class Node implements NodeModelWarningListener {
             if (checkPortObjectSpecClass(spec, i)) {
                 m_outputs[i].spec = spec;
             } else {
-                Class<? extends PortObjectSpec> specClass =
-                    m_outputs[i].type.getPortObjectSpecClass();
-                loadResult.addError("Loaded PortObjectSpec of class \""
-                        + spec.getClass().getSimpleName() + ", expected "
-                        + specClass.getSimpleName());
+                Class<? extends PortObjectSpec> specClass = m_outputs[i].type.getPortObjectSpecClass();
+                loadResult.addError("Loaded PortObjectSpec of class \"" + spec.getClass().getSimpleName()
+                    + ", expected " + specClass.getSimpleName());
                 loader.setNeedsResetAfterLoad();
             }
 
@@ -476,19 +492,16 @@ public final class Node implements NodeModelWarningListener {
                 m_outputs[i].object = obj;
                 m_outputs[i].summary = loader.getPortObjectSummary(i);
             } else {
-                Class<? extends PortObject> objClass =
-                    m_outputs[i].type.getPortObjectClass();
-                loadResult.addError("Loaded PortObject of class \""
-                        + obj.getClass().getSimpleName() + ", expected "
-                        + objClass.getSimpleName());
+                Class<? extends PortObject> objClass = m_outputs[i].type.getPortObjectClass();
+                loadResult.addError("Loaded PortObject of class \"" + obj.getClass().getSimpleName() + ", expected "
+                    + objClass.getSimpleName());
                 loader.setNeedsResetAfterLoad();
             }
             if (m_outputs[i].object != null) {
                 // overwrites the spec that is read few rows above
                 spec = m_outputs[i].object.getSpec();
                 m_outputs[i].spec = spec;
-                m_outputs[i].hiliteHdl =
-                    (i == 0) ? null : m_model.getOutHiLiteHandler(i - 1);
+                m_outputs[i].hiliteHdl = (i == 0) ? null : m_model.getOutHiLiteHandler(i - 1);
             }
         }
         m_model.restoreWarningMessage(loader.getWarningMessage());
@@ -508,8 +521,8 @@ public final class Node implements NodeModelWarningListener {
                         LOGGER.debug(error);
                     }
                 } else {
-                    error = "Caught \"" + e.getClass().getSimpleName() + "\", "
-                        + "Loading model internals failed: " + e.getMessage();
+                    error = "Caught \"" + e.getClass().getSimpleName() + "\", " + "Loading model internals failed: "
+                        + e.getMessage();
                     LOGGER.coding(error, e);
                 }
                 loadResult.addError(error, true);
@@ -526,7 +539,7 @@ public final class Node implements NodeModelWarningListener {
                         ((PortObjectHolder)m_model).setInternalPortObjects(copy);
                     } catch (Exception e) {
                         String message = "Unable to load port objects into node instance "
-                                + m_model.getClass().getSimpleName() + ": " + e.getMessage();
+                            + m_model.getClass().getSimpleName() + ": " + e.getMessage();
                         LOGGER.warn(message, e);
                         loadResult.addError(message, true);
                         loader.setNeedsResetAfterLoad();
@@ -537,8 +550,8 @@ public final class Node implements NodeModelWarningListener {
                     try {
                         copy = NodeModel.toBDTArray(m_internalHeldPortObjects, "Internal held objects array index",
                             m_model.getClass().getSimpleName() + " should implement "
-                                    + PortObjectHolder.class.getSimpleName() + " and not "
-                                    + BufferedDataTableHolder.class.getSimpleName());
+                                + PortObjectHolder.class.getSimpleName() + " and not "
+                                + BufferedDataTableHolder.class.getSimpleName());
                         ((BufferedDataTableHolder)m_model).setInternalTables(copy);
                     } catch (IOException e) {
                         loadResult.addError(e.getMessage(), true);
@@ -553,8 +566,10 @@ public final class Node implements NodeModelWarningListener {
 
     }
 
-    /** Loads execution result from remote execution (e.g. cluster execution). Implementation calls
+    /**
+     * Loads execution result from remote execution (e.g. cluster execution). Implementation calls
      * {@link #loadDataAndInternals(NodeContentPersistor, ExecutionMonitor, LoadResult)} and also loads flow variables.
+     *
      * @param result To load from.
      * @param exec For progress.
      * @param loadResult to add errors and warnings to (if any)
@@ -564,34 +579,32 @@ public final class Node implements NodeModelWarningListener {
         final LoadResult loadResult) {
         loadDataAndInternals(result, exec, loadResult);
         // Push saved flow variables, if present, onto outgoing stack (unsetting owner)
-        result.getFlowVariables().ifPresent(l -> l.stream()
-            .map(f -> FlowObjectStack.cloneUnsetOwner(f)).forEach(f -> m_model.pushFlowVariable(f)));
+        result.getFlowVariables().ifPresent(
+            l -> l.stream().map(f -> FlowObjectStack.cloneUnsetOwner(f)).forEach(f -> m_model.pushFlowVariable(f)));
     }
 
-
-//    /** Calls {@link NodeFactory#createNodeConfiguration(ConfigRegistry)} and
-//     * returns it.
-//     * @return The config as defined by the factory.
-//     */
-//    // to be made private
-//    NodeConfiguration createNewEmptyNodeConfiguration() {
-//        ConfigRegistry configReg = ConfigRegistry.internalCreateNew("node");
-//        NodeConfiguration nc;
-//        try {
-//            nc = m_factory.createNodeConfiguration(configReg);
-//        } catch (final Exception e) {
-//            m_logger.coding("Failed to create node configuration "
-//                    + "from factory, node will have no settings", e);
-//            nc = new NodeConfiguration(configReg);
-//        }
-//        configReg.setDisallowElementAdding();
-//        // nc might be null for old obsolete node settings based nodes.
-//        return nc;
-//    }
+    //    /** Calls {@link NodeFactory#createNodeConfiguration(ConfigRegistry)} and
+    //     * returns it.
+    //     * @return The config as defined by the factory.
+    //     */
+    //    // to be made private
+    //    NodeConfiguration createNewEmptyNodeConfiguration() {
+    //        ConfigRegistry configReg = ConfigRegistry.internalCreateNew("node");
+    //        NodeConfiguration nc;
+    //        try {
+    //            nc = m_factory.createNodeConfiguration(configReg);
+    //        } catch (final Exception e) {
+    //            m_logger.coding("Failed to create node configuration "
+    //                    + "from factory, node will have no settings", e);
+    //            nc = new NodeConfiguration(configReg);
+    //        }
+    //        configReg.setDisallowElementAdding();
+    //        // nc might be null for old obsolete node settings based nodes.
+    //        return nc;
+    //    }
 
     /**
-     * Calls {@link NodeModel#loadSettingsFrom(NodeSettingsRO)}. Only used by 3rd party executors
-     * to clone node.<br>
+     * Calls {@link NodeModel#loadSettingsFrom(NodeSettingsRO)}. Only used by 3rd party executors to clone node.<br>
      * <b>Note:</b> The KNIME core is using {@link #loadModelSettingsFrom(NodeSettingsRO)}.
      *
      * @param modelSettings a settings object
@@ -607,15 +620,16 @@ public final class Node implements NodeModelWarningListener {
         } catch (InvalidSettingsException e) {
             throw e;
         } catch (Throwable t) {
-            String msg = "Loading model settings failed, caught \""
-                    + t.getClass().getSimpleName() + "\": " + t.getMessage();
+            String msg =
+                "Loading model settings failed, caught \"" + t.getClass().getSimpleName() + "\": " + t.getMessage();
             LOGGER.coding(msg, t);
             throw new InvalidSettingsException(msg, t);
         }
     }
+
     /**
-     * Loads the settings (but not the data) from the given settings object. Caller is required to only call this
-     * method with validated settings (as per {@link #validateModelSettings(NodeSettingsRO)}).
+     * Loads the settings (but not the data) from the given settings object. Caller is required to only call this method
+     * with validated settings (as per {@link #validateModelSettings(NodeSettingsRO)}).
      *
      * @param modelSettings a settings object
      * @throws InvalidSettingsException not expected if validation and model loading are consistent...
@@ -625,15 +639,15 @@ public final class Node implements NodeModelWarningListener {
         /* Note, as of 2.8 the argument contains ONLY the actual settings, no variable settings. The root element
          * is passed to the NodeModel. In 2.7- the root element was "model" and "variableSettings"; */
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
 
         try {
             m_model.loadSettingsFrom(modelSettings);
         } catch (InvalidSettingsException e) {
             throw e;
         } catch (Throwable t) {
-            String msg = "Loading model settings failed, caught \""
-                    + t.getClass().getSimpleName() + "\": " + t.getMessage();
+            String msg =
+                "Loading model settings failed, caught \"" + t.getClass().getSimpleName() + "\": " + t.getMessage();
             LOGGER.coding(msg, t);
             throw new InvalidSettingsException(msg, t);
         }
@@ -650,7 +664,7 @@ public final class Node implements NodeModelWarningListener {
     // (previously called areSettingsValid with boolean return type)
     public void validateModelSettings(final NodeSettingsRO modelSettings) throws InvalidSettingsException {
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
 
         /* Note the comment in method loadSettingsFrom(NodeSettingsROf) */
         try {
@@ -679,7 +693,11 @@ public final class Node implements NodeModelWarningListener {
      * @return the creation context
      */
     public Optional<INodeCreationContext> getContext() {
-        return Optional.ofNullable(m_context);
+        if (m_context != null) {
+            return Optional.of(m_context.cloneIt());
+        }
+        return Optional.ofNullable(m_factory instanceof ConfigurablePortsNodeFactory
+            ? ((ConfigurablePortsNodeFactory<NodeModel>)m_factory).createCreationContext() : null);
     }
 
     /**
@@ -692,8 +710,7 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * The XML description can be used with the
-     * <code>NodeFactoryHTMLCreator</code> in order to get a converted HTML
+     * The XML description can be used with the <code>NodeFactoryHTMLCreator</code> in order to get a converted HTML
      * description of it, which fits the overall KNIME HTML style.
      *
      * @return XML description of the node
@@ -739,8 +756,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Return the name of the port as specified by the node factory (which
-     * takes it from the node description).
+     * Return the name of the port as specified by the node factory (which takes it from the node description).
+     *
      * @param index the port index
      * @return the name of the port as specified by the node factory.
      */
@@ -774,8 +791,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Return the name of the port as specified by the node factory (which
-     * takes it from the node description).
+     * Return the name of the port as specified by the node factory (which takes it from the node description).
+     *
      * @param index the port index
      * @return the name of the port as specified by the node factory.
      */
@@ -813,9 +830,11 @@ public final class Node implements NodeModelWarningListener {
         return m_outputs[index].hiliteHdl;
     }
 
-    /** Get the current set of objects internally held by a NodeModel that implements {@link BufferedDataTableHolder} or
+    /**
+     * Get the current set of objects internally held by a NodeModel that implements {@link BufferedDataTableHolder} or
      * {@link PortObjectHolder}. It may be null or contain null elements. This array is modified upon load, execute and
      * reset.
+     *
      * @return that array.
      */
     public PortObject[] getInternalHeldPortObjects() {
@@ -830,11 +849,14 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Counter part to {@link #setInHiLiteHandler(int, HiLiteHandler)}.
+    /**
+     * Counter part to {@link #setInHiLiteHandler(int, HiLiteHandler)}.
+     *
      * @param index The port.
      * @return the hilite handler.
      * @since 2.10
-     * @noreference This method is not intended to be referenced by clients. */
+     * @noreference This method is not intended to be referenced by clients.
+     */
     public HiLiteHandler getInHiLiteHandler(final int index) {
         assert 0 <= index && index < getNrInPorts();
         if (index > 0) {
@@ -855,25 +877,25 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * @return true if configure or execute were skipped because nodes is
-     *   part of an inactive branch.
+     * @return true if configure or execute were skipped because nodes is part of an inactive branch.
      * @see InactiveBranchPortObjectSpec
      */
     public boolean isInactive() {
-        return m_outputs[0].spec == null ? false
-                : m_outputs[0].spec instanceof InactiveBranchPortObjectSpec;
+        return m_outputs[0].spec == null ? false : m_outputs[0].spec instanceof InactiveBranchPortObjectSpec;
     }
 
-    /** Returns true if the contained model is an instance of
-     * {@link InactiveBranchConsumer}.
+    /**
+     * Returns true if the contained model is an instance of {@link InactiveBranchConsumer}.
+     *
      * @return Such a property.
      */
     public boolean isInactiveBranchConsumer() {
         return m_model instanceof InactiveBranchConsumer;
     }
 
-    /** Iterates the argument array and returns true if any element
-     * is instance of {@link InactiveBranchPortObject}.
+    /**
+     * Iterates the argument array and returns true if any element is instance of {@link InactiveBranchPortObject}.
+     *
      * @param ins The input data
      * @return true if any input is inactive.
      */
@@ -886,8 +908,9 @@ public final class Node implements NodeModelWarningListener {
         return false;
     }
 
-    /** Iterates the argument array and returns true if any element
-     * is instance of {@link InactiveBranchPortObjectSpec}.
+    /**
+     * Iterates the argument array and returns true if any element is instance of {@link InactiveBranchPortObjectSpec}.
+     *
      * @param ins The input data
      * @return true if any input is inactive.
      * @since 2.11
@@ -901,42 +924,38 @@ public final class Node implements NodeModelWarningListener {
         return false;
     }
 
-   /**
-    * @param rawData the data from the predecessor.
-    * @param exec The execution monitor.
-    * @return <code>true</code> if execution was successful otherwise
-    *         <code>false</code>.
-    * @see Node#execute(PortObject[], ExecutionEnvironment, ExecutionContext)
-    */
+    /**
+     * @param rawData the data from the predecessor.
+     * @param exec The execution monitor.
+     * @return <code>true</code> if execution was successful otherwise <code>false</code>.
+     * @see Node#execute(PortObject[], ExecutionEnvironment, ExecutionContext)
+     */
     @Deprecated
     public boolean execute(final PortObject[] rawData, final ExecutionContext exec) {
         return execute(rawData, new ExecutionEnvironment(), exec);
     }
 
     /**
-     * Starts executing this node. If the node has been executed already, it
-     * does nothing - just returns <code>true</code>.
+     * Starts executing this node. If the node has been executed already, it does nothing - just returns
+     * <code>true</code>.
      *
      *
-     * Otherwise, the procedure starts executing all predecessor nodes connected
-     * to an input port (which in turn recursively trigger their predecessors)
-     * and calls the function <code>#execute()</code> in the model after all
-     * connected nodes return successfully. If a port is not connected this
-     * function returns false without executing itself (it may have executed
-     * some predecessor nodes though). If a predecessor node returns false this
-     * method also returns false without executing this node or any further
-     * connected node.
+     * Otherwise, the procedure starts executing all predecessor nodes connected to an input port (which in turn
+     * recursively trigger their predecessors) and calls the function <code>#execute()</code> in the model after all
+     * connected nodes return successfully. If a port is not connected this function returns false without executing
+     * itself (it may have executed some predecessor nodes though). If a predecessor node returns false this method also
+     * returns false without executing this node or any further connected node.
      *
      * @param rawInData the data from the predecessor, includes flow variable port.
      * @param exEnv the environment for the execution.
      * @param exec The execution monitor.
-     * @return <code>true</code> if execution was successful otherwise
-     *         <code>false</code>.
+     * @return <code>true</code> if execution was successful otherwise <code>false</code>.
      * @see NodeModel#execute(BufferedDataTable[],ExecutionContext)
      * @noreference This method is not intended to be referenced by clients.
      * @since 2.8
      */
-    public boolean execute(final PortObject[] rawInData, final ExecutionEnvironment exEnv, final ExecutionContext exec) {
+    public boolean execute(final PortObject[] rawInData, final ExecutionEnvironment exEnv,
+        final ExecutionContext exec) {
         LOGGER.assertLog(NodeContext.getContext() != null,
             "No node context available, please check call hierarchy and fix it");
 
@@ -977,11 +996,11 @@ public final class Node implements NodeModelWarningListener {
                     return false;
                 }
                 if (rawInData[i] == null) { // optional input
-                    newInData[i] = null;  // (checked above)
+                    newInData[i] = null; // (checked above)
                 } else if (rawInData[i] instanceof BufferedDataTable) {
                     newInData[i] = rawInData[i];
                 } else {
-                    exec.setMessage("Copying input object at port " +  i);
+                    exec.setMessage("Copying input object at port " + i);
                     ExecutionContext subExec = exec.createSubExecutionContext(0.0);
                     try {
                         newInData[i] = copyPortObject(rawInData[i], subExec);
@@ -990,7 +1009,7 @@ public final class Node implements NodeModelWarningListener {
                         return false;
                     } catch (Throwable e) {
                         createErrorMessageAndNotify("Unable to clone input data at port " + i + " ("
-                                + m_inputs[i].getName() + "): " + e.getMessage(), e);
+                            + m_inputs[i].getName() + "): " + e.getMessage(), e);
                         return false;
                     }
                 }
@@ -1009,8 +1028,8 @@ public final class Node implements NodeModelWarningListener {
                 // writing to a buffer is done asynchronously -- if this thread
                 // is interrupted while waiting for the IO thread to flush we take
                 // it as a graceful exit
-                isCanceled = isCanceled || (th instanceof DataContainerException
-                        && th.getCause() instanceof InterruptedException);
+                isCanceled = isCanceled
+                    || (th instanceof DataContainerException && th.getCause() instanceof InterruptedException);
                 if (isCanceled) {
                     // clear the flag so that the ThreadPool does not kill the thread
                     Thread.interrupted();
@@ -1047,8 +1066,7 @@ public final class Node implements NodeModelWarningListener {
                 if (th.getMessage() != null && th.getMessage().length() >= 5) {
                     message = message.concat(th.getMessage());
                 } else {
-                    message = message.concat("(\"" + th.getClass().getSimpleName()
-                            + "\"): " + th.getMessage());
+                    message = message.concat("(\"" + th.getClass().getSimpleName() + "\"): " + th.getMessage());
                 }
                 reset();
                 createErrorMessageAndNotify(message, th);
@@ -1088,7 +1106,7 @@ public final class Node implements NodeModelWarningListener {
                     // loop is inactive.
                     // Pop Scope object
                     // => this is done in configure, not needed here! (MB: Hittisau 2013)
-//                    getOutgoingFlowObjectStack().pop(FlowScopeContext.class);
+                    //                    getOutgoingFlowObjectStack().pop(FlowScopeContext.class);
                 }
             }
             assert !m_model.hasContent() : "Inactive node should have no content in node model";
@@ -1110,8 +1128,10 @@ public final class Node implements NodeModelWarningListener {
         return true;
     } // execute
 
-    /** Called after execute to retrieve internal held objects from underlying NodeModel and to do some clean-up with
+    /**
+     * Called after execute to retrieve internal held objects from underlying NodeModel and to do some clean-up with
      * previous objects. Only relevant for {@link BufferedDataTableHolder} and {@link PortObjectHolder}.
+     *
      * @param rawInData Raw in data, potentially empty array for streaming executor
      * @param exEnv exec environment or null
      * @param exec Context - for wrapper table creation
@@ -1126,8 +1146,8 @@ public final class Node implements NodeModelWarningListener {
         // they can be discarded if no longer needed; they are not part of the internal tables after this execution
         PortObject[] previousInternalHeldTables = m_internalHeldPortObjects;
         if (previousInternalHeldTables != null
-                && !(this.isModelCompatibleTo(LoopStartNode.class) || this.isModelCompatibleTo(LoopEndNode.class))
-                && !((exEnv != null) && (exEnv.reExecute()))) {
+            && !(this.isModelCompatibleTo(LoopStartNode.class) || this.isModelCompatibleTo(LoopEndNode.class))
+            && !((exEnv != null) && (exEnv.reExecute()))) {
             LOGGER.coding("Found internal tables for non loop node: " + getName());
         }
 
@@ -1177,14 +1197,16 @@ public final class Node implements NodeModelWarningListener {
      * @see #invokeNodeModelExecute(ExecutionContext, PortObject[])
      * @since 2.6
      */
-    public PortObject[] invokeNodeModelExecute(final ExecutionContext exec,
-        final PortObject[] inData) throws Exception {
+    public PortObject[] invokeNodeModelExecute(final ExecutionContext exec, final PortObject[] inData)
+        throws Exception {
         return invokeNodeModelExecute(exec, new ExecutionEnvironment(), inData);
     }
 
-    /** Calls {@link #invokeFullyNodeModelExecute(ExecutionContext, ExecutionEnvironment, PortObject[])} with
-     * additional array element indicating flow variable port. This method is to be used when the caller doesn't use
-     * the optional flow variable in and output, e.g. for source nodes the argument array has length 0.
+    /**
+     * Calls {@link #invokeFullyNodeModelExecute(ExecutionContext, ExecutionEnvironment, PortObject[])} with additional
+     * array element indicating flow variable port. This method is to be used when the caller doesn't use the optional
+     * flow variable in and output, e.g. for source nodes the argument array has length 0.
+     *
      * @param exec The execution context.
      * @param exEnv The execution environment.
      * @param inData The input data to the node (excluding flow var port)
@@ -1193,16 +1215,19 @@ public final class Node implements NodeModelWarningListener {
      * @since 2.8
      */
     public PortObject[] invokeNodeModelExecute(final ExecutionContext exec, final ExecutionEnvironment exEnv,
-            final PortObject[] inData) throws Exception {
+        final PortObject[] inData) throws Exception {
         PortObject[] extendedInData = ArrayUtils.add(inData, 0, FlowVariablePortObject.INSTANCE);
         PortObject[] extendedOutData = invokeFullyNodeModelExecute(exec, exEnv, extendedInData);
         return ArrayUtils.remove(extendedOutData, 0);
     }
 
-    /** Invokes package private method {@link NodeModel#executeModel(PortObject[], ExecutionEnvironment,
-     * ExecutionContext)}. The array argument and result include the optional flow variable in- and output (all nodes
-     * have at least one in- and one output).
-     * <p>Isolated in a separate method call as it may be (ab)used by other executors.
+    /**
+     * Invokes package private method
+     * {@link NodeModel#executeModel(PortObject[], ExecutionEnvironment, ExecutionContext)}. The array argument and
+     * result include the optional flow variable in- and output (all nodes have at least one in- and one output).
+     * <p>
+     * Isolated in a separate method call as it may be (ab)used by other executors.
+     *
      * @param exec The execution context.
      * @param exEnv The execution environment.
      * @param inData The input data to the node (including flow var port)
@@ -1216,7 +1241,9 @@ public final class Node implements NodeModelWarningListener {
         return m_model.executeModel(inData, exEnv, exec);
     }
 
-    /** Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+    /**
+     * Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+     *
      * @param model to call on.
      * @return result of that call
      * @noreference This method is not intended to be referenced by clients.
@@ -1225,7 +1252,9 @@ public final class Node implements NodeModelWarningListener {
         return model.peekFlowScopeContext();
     }
 
-    /** Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+    /**
+     * Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+     *
      * @param model to call on.
      * @param v method argument
      * @noreference This method is not intended to be referenced by clients.
@@ -1234,44 +1263,49 @@ public final class Node implements NodeModelWarningListener {
         model.pushFlowVariable(v);
     }
 
-    /** Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+    /**
+     * Invokes the corresponding package scope method in class NodeModel. Put here to avoid adding API.
+     *
      * @param model to call on.
      * @param types method argument
      * @return result of that invocation.
      * @noreference This method is not intended to be referenced by clients.
      * @since 3.1
      */
-    public static Map<String, FlowVariable> invokeGetAvailableFlowVariables(
-        final NodeModel model, final FlowVariable.Type...types) {
+    public static Map<String, FlowVariable> invokeGetAvailableFlowVariables(final NodeModel model,
+        final FlowVariable.Type... types) {
         return model.getAvailableFlowVariables(types);
     }
 
-    /** Invokes the corresponding package scope method in class NodeDialogPane. Put here to avoid adding API.
+    /**
+     * Invokes the corresponding package scope method in class NodeDialogPane. Put here to avoid adding API.
+     *
      * @param dialog to call on.
      * @param types method argument
      * @return result of that invocation.
      * @noreference This method is not intended to be referenced by clients.
      * @since 3.1
      */
-    public static Map<String, FlowVariable> invokeGetAvailableFlowVariables(
-        final NodeDialogPane dialog, final FlowVariable.Type...types) {
+    public static Map<String, FlowVariable> invokeGetAvailableFlowVariables(final NodeDialogPane dialog,
+        final FlowVariable.Type... types) {
         return dialog.getAvailableFlowVariables(types);
     }
 
-    /** Called after execute in order to put the computed result into the
-     * outports. It will do a sequence of sanity checks whether the argument
-     * is valid (non-null, correct type, etc.)
+    /**
+     * Called after execute in order to put the computed result into the outports. It will do a sequence of sanity
+     * checks whether the argument is valid (non-null, correct type, etc.)
+     *
      * @param newOutData The computed output data
      * @param tolerateNullOutports used e.g. when loop is continued (outports may not yet be available)
      * @param tolerateDifferentSpecs used e.g. when re-executing a node (table may be different from configure)
      * @return Whether that is successful (false in case of incompatible port objects)
      */
-    private boolean setOutPortObjects(final PortObject[] newOutData,
-            final boolean tolerateNullOutports, final boolean tolerateDifferentSpecs) {
+    private boolean setOutPortObjects(final PortObject[] newOutData, final boolean tolerateNullOutports,
+        final boolean tolerateDifferentSpecs) {
         CheckUtils.checkArgumentNotNull(newOutData, "Port object array is null");
         if (newOutData.length != getNrOutPorts()) {
-            throw new IndexOutOfBoundsException("Array is expected to be of "
-                    + "length " + getNrOutPorts() + ": " + newOutData.length);
+            throw new IndexOutOfBoundsException(
+                "Array is expected to be of " + "length " + getNrOutPorts() + ": " + newOutData.length);
         }
         // check for compatible output PortObjects
         for (int i = 0; i < newOutData.length; i++) {
@@ -1286,21 +1320,21 @@ public final class Node implements NodeModelWarningListener {
                     // TODO ensure model was skipped during configure?
                 } else if (!thisType.getPortObjectClass().isInstance(newOutData[i])) {
                     createErrorMessageAndNotify("Invalid output port object at port " + i);
-                    LOGGER.error("  (Wanted: " + thisType.getPortObjectClass().getName() + ", "
-                    + "actual: " + newOutData[i].getClass().getName() + ")");
+                    LOGGER.error("  (Wanted: " + thisType.getPortObjectClass().getName() + ", " + "actual: "
+                        + newOutData[i].getClass().getName() + ")");
                     return false;
                 }
                 PortObjectSpec spec;
                 try {
                     spec = newOutData[i].getSpec();
                 } catch (Throwable t) {
-                    createErrorMessageAndNotify("PortObject \"" + newOutData[i].getClass().getName()
-                            + "\" threw " + t.getClass().getSimpleName() + " on #getSpec() ", t);
+                    createErrorMessageAndNotify("PortObject \"" + newOutData[i].getClass().getName() + "\" threw "
+                        + t.getClass().getSimpleName() + " on #getSpec() ", t);
                     return false;
                 }
                 if (spec == null) {
-                    createErrorMessageAndNotify("Implementation Error: PortObject \""
-                            + newOutData[i].getClass().getName() + "\" must not"
+                    createErrorMessageAndNotify(
+                        "Implementation Error: PortObject \"" + newOutData[i].getClass().getName() + "\" must not"
                             + " have null spec (output port " + i + ").");
                     return false;
                 }
@@ -1336,7 +1370,9 @@ public final class Node implements NodeModelWarningListener {
         return true;
     }
 
-    /** Sets new file store handler, disposes old one first.
+    /**
+     * Sets new file store handler, disposes old one first.
+     *
      * @param fileStoreHandler new handler (possibly null to unset)
      * @noreference This method is not intended to be referenced by clients.
      */
@@ -1347,7 +1383,8 @@ public final class Node implements NodeModelWarningListener {
     /**
      * @return the file store handler for the current execution (or null if not executed or run with 3rd party executor)
      * @since 2.6
-     * @noreference This method is not intended to be referenced by clients.  */
+     * @noreference This method is not intended to be referenced by clients.
+     */
     public IFileStoreHandler getFileStoreHandler() {
         return m_fileStoreHandler;
     }
@@ -1363,25 +1400,27 @@ public final class Node implements NodeModelWarningListener {
         // this call requires the FSH to be set on the node (ideally NativeNodeContainer.createExecutionContext
         // would take a FSH as argument but it became API unfortunately)
         // also: can be null if node is in an inactive branch -> no file store handler is initialized in that case
-        if (m_fileStoreHandler instanceof IWriteFileStoreHandler)  {
+        if (m_fileStoreHandler instanceof IWriteFileStoreHandler) {
             ((IWriteFileStoreHandler)m_fileStoreHandler).open(ec);
         }
     }
 
-    /** Copies the PortObject so that the copy can be given to the node model
-     * implementation (and potentially modified). The copy is carried out by
-     * means of the respective serializer (via streams).
+    /**
+     * Copies the PortObject so that the copy can be given to the node model implementation (and potentially modified).
+     * The copy is carried out by means of the respective serializer (via streams).
      *
-     * <p> Note that this method is meant to be used by the framework only.
+     * <p>
+     * Note that this method is meant to be used by the framework only.
+     *
      * @param portObject The object to be copied.
      * @param exec For progress/cancel
      * @return The (deep) copy.
-     * @throws IOException In case of exceptions while accessing the stream or
-     * if the argument is an instance of {@link BufferedDataTable}.
-     * @throws CanceledExecutionException If canceled. */
-    public static PortObject copyPortObject(final PortObject portObject,
-            final ExecutionContext exec) throws IOException,
-            CanceledExecutionException {
+     * @throws IOException In case of exceptions while accessing the stream or if the argument is an instance of
+     *             {@link BufferedDataTable}.
+     * @throws CanceledExecutionException If canceled.
+     */
+    public static PortObject copyPortObject(final PortObject portObject, final ExecutionContext exec)
+        throws IOException, CanceledExecutionException {
         if (portObject instanceof BufferedDataTable) {
             throw new IOException("Can't copy BufferedDataTable objects");
         }
@@ -1392,21 +1431,17 @@ public final class Node implements NodeModelWarningListener {
             PortTypeRegistry.getInstance().getSpecSerializer(s.getClass()).get();
 
         ByteArrayOutputStream byteOut = new ByteArrayOutputStream(10 * 1024);
-        PortObjectSpecZipOutputStream specOut =
-            PortUtil.getPortObjectSpecZipOutputStream(byteOut);
+        PortObjectSpecZipOutputStream specOut = PortUtil.getPortObjectSpecZipOutputStream(byteOut);
         specOut.setLevel(0);
         ser.savePortObjectSpec(s, specOut);
         specOut.close();
-        ByteArrayInputStream byteIn =
-            new ByteArrayInputStream(byteOut.toByteArray());
-        PortObjectSpecZipInputStream specIn =
-            PortUtil.getPortObjectSpecZipInputStream(byteIn);
+        ByteArrayInputStream byteIn = new ByteArrayInputStream(byteOut.toByteArray());
+        PortObjectSpecZipInputStream specIn = PortUtil.getPortObjectSpecZipInputStream(byteIn);
         PortObjectSpec specCopy = ser.loadPortObjectSpec(specIn);
         specIn.close();
 
-        DeferredFileOutputStream deferredOutputStream = new DeferredFileOutputStream(
-                /* 10 MB */10 * 1024 * 1024, "knime-portobject-copy-", ".bin",
-                new File(KNIMEConstants.getKNIMETempDir()));
+        DeferredFileOutputStream deferredOutputStream = new DeferredFileOutputStream(/* 10 MB */10 * 1024 * 1024,
+            "knime-portobject-copy-", ".bin", new File(KNIMEConstants.getKNIMETempDir()));
         PortObject.PortObjectSerializer obSer =
             PortTypeRegistry.getInstance().getObjectSerializer(portObject.getClass()).get();
         PortObjectZipOutputStream objOut = PortUtil.getPortObjectZipOutputStream(deferredOutputStream);
@@ -1433,10 +1468,9 @@ public final class Node implements NodeModelWarningListener {
         return result;
     }
 
-
     /**
-     * Creates a new {@link NodeMessage} object of type warning and notifies
-     * registered {@link NodeMessageListener}s. Also logs a warning message.
+     * Creates a new {@link NodeMessage} object of type warning and notifies registered {@link NodeMessageListener}s.
+     * Also logs a warning message.
      *
      * @param warningMessage the new warning message
      */
@@ -1445,27 +1479,24 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Creates a new {@link NodeMessage} object of type warning and notifies
-     * registered {@link NodeMessageListener}s. Also logs a warning message.
-     * If a throwable is provided its stacktrace is logged at debug level.
+     * Creates a new {@link NodeMessage} object of type warning and notifies registered {@link NodeMessageListener}s.
+     * Also logs a warning message. If a throwable is provided its stacktrace is logged at debug level.
      *
      * @noreference This method is not intended to be referenced by clients.
      * @param warningMessage the new warning message
      * @param t its stacktrace is logged at debug level.
      */
-    public void createWarningMessageAndNotify(final String warningMessage,
-            final Throwable t) {
+    public void createWarningMessageAndNotify(final String warningMessage, final Throwable t) {
         LOGGER.warn(warningMessage);
         if (t != null) {
             LOGGER.debug(warningMessage, t);
         }
-        notifyMessageListeners(new NodeMessage(NodeMessage.Type.WARNING,
-                warningMessage));
+        notifyMessageListeners(new NodeMessage(NodeMessage.Type.WARNING, warningMessage));
     }
 
     /**
-     * Creates a new {@link NodeMessage} object of type error and notifies
-     * registered {@link NodeMessageListener}s. Also logs an error message.
+     * Creates a new {@link NodeMessage} object of type error and notifies registered {@link NodeMessageListener}s. Also
+     * logs an error message.
      *
      * @param errorMessage the new error message
      */
@@ -1474,32 +1505,28 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Creates a new {@link NodeMessage} object of type error and notifies
-     * registered {@link NodeMessageListener}s. Also logs an error message.
-     * If a throwable is provided its stacktrace is logged at debug level.
+     * Creates a new {@link NodeMessage} object of type error and notifies registered {@link NodeMessageListener}s. Also
+     * logs an error message. If a throwable is provided its stacktrace is logged at debug level.
      *
      * @noreference This method is not intended to be referenced by clients.
      * @param errorMessage the new error message
      * @param t its stacktrace is logged at debug level.
      */
-    public void createErrorMessageAndNotify(final String errorMessage, final
-            Throwable t) {
+    public void createErrorMessageAndNotify(final String errorMessage, final Throwable t) {
         LOGGER.error(errorMessage, t);
-        notifyMessageListeners(new NodeMessage(NodeMessage.Type.ERROR,
-                errorMessage));
+        notifyMessageListeners(new NodeMessage(NodeMessage.Type.ERROR, errorMessage));
     }
 
     /**
-     * Notifies all registered {@link NodeMessageListener}s that the node's
-     * message is cleared.
+     * Notifies all registered {@link NodeMessageListener}s that the node's message is cleared.
      */
     private void clearNodeMessageAndNotify() {
         notifyMessageListeners(NodeMessage.NONE);
     }
 
     /**
-     * Is called, when a warning message is set in the {@link NodeModel}.
-     * Forwards it to registered {@link NodeMessageListener}s.
+     * Is called, when a warning message is set in the {@link NodeModel}. Forwards it to registered
+     * {@link NodeMessageListener}s.
      *
      * @param warningMessage the new message in the node model.
      */
@@ -1515,8 +1542,9 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Getter for the currently set node warning message in the corresponding
-     * NodeModel.
+    /**
+     * Getter for the currently set node warning message in the corresponding NodeModel.
+     *
      * @return The currently set warning message (may be null).
      */
     public String getWarningMessageFromModel() {
@@ -1528,7 +1556,7 @@ public final class Node implements NodeModelWarningListener {
      */
     public void reset() {
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
 
         LOGGER.debug("reset");
         clearLoopContext();
@@ -1537,8 +1565,9 @@ public final class Node implements NodeModelWarningListener {
         clearNodeMessageAndNotify();
     }
 
-    /** Sets output objects to null, disposes tables that are created by
-     * this node.
+    /**
+     * Sets output objects to null, disposes tables that are created by this node.
+     *
      * @deprecated Framework code should call {@link #cleanOutPorts(boolean)}
      * @noreference This method is not intended to be referenced by clients.
      */
@@ -1547,12 +1576,12 @@ public final class Node implements NodeModelWarningListener {
         cleanOutPorts(false);
     }
 
-
-    /** Sets output objects to null.
-     * @param isLoopRestart If true, does not clear tables that are part
-     * of the internally held tables (loop start nodes implements the
-     * {@link BufferedDataTableHolder} interface). This can only be true
-     * between two loop iterations.
+    /**
+     * Sets output objects to null.
+     *
+     * @param isLoopRestart If true, does not clear tables that are part of the internally held tables (loop start nodes
+     *            implements the {@link BufferedDataTableHolder} interface). This can only be true between two loop
+     *            iterations.
      * @noreference This method is not intended to be referenced by clients.
      */
     public void cleanOutPorts(final boolean isLoopRestart) {
@@ -1566,13 +1595,11 @@ public final class Node implements NodeModelWarningListener {
             }
             if (flc == null && !this.isModelCompatibleTo(LoopStartNode.class)) {
                 LOGGER.coding("Encountered a loop restart action but there is"
-                        + " no loop context on the flow object stack (node "
-                        + getName() + ")");
+                    + " no loop context on the flow object stack (node " + getName() + ")");
             }
         }
         LOGGER.debug("clean output ports.");
-        Set<BufferedDataTable> disposableTables =
-            new LinkedHashSet<BufferedDataTable>();
+        Set<BufferedDataTable> disposableTables = new LinkedHashSet<BufferedDataTable>();
         for (int i = 0; i < m_outputs.length; i++) {
             PortObject portObject = m_outputs[i].object;
             if (portObject instanceof BufferedDataTable) {
@@ -1585,8 +1612,7 @@ public final class Node implements NodeModelWarningListener {
         }
 
         if (m_internalHeldPortObjects != null) {
-            Set<BufferedDataTable> internalTableSet =
-                collectTableAndReferences(m_internalHeldPortObjects);
+            Set<BufferedDataTable> internalTableSet = collectTableAndReferences(m_internalHeldPortObjects);
             // internal tables are also used by loop start implementations to
             // keep temporary tables between two loop iterations (e.g. the
             // the group loop start first sorts the table and then puts parts
@@ -1609,8 +1635,7 @@ public final class Node implements NodeModelWarningListener {
         m_localTempTables.clear();
     }
 
-    private Set<BufferedDataTable> collectTableAndReferences(
-            final PortObject[] objects) {
+    private Set<BufferedDataTable> collectTableAndReferences(final PortObject[] objects) {
         if (objects == null || objects.length == 0) {
             return Collections.emptySet();
         }
@@ -1625,8 +1650,7 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Adds the argument set of tables to the set of temporary tables in this
-     * node. Called after execute.
+     * Adds the argument set of tables to the set of temporary tables in this node. Called after execute.
      *
      * @param tempTables Tables to add, not <code>null</code>.
      */
@@ -1634,8 +1658,10 @@ public final class Node implements NodeModelWarningListener {
         m_localTempTables.addAll(tempTables);
     }
 
-    /** Enumerates the output tables and puts them into the global workflow repository of tables. This method delegates
+    /**
+     * Enumerates the output tables and puts them into the global workflow repository of tables. This method delegates
      * from the NodeContainer class to access a package-scope method in BufferedDataTable.
+     *
      * @param repository The global repository.
      * @since 3.7
      */
@@ -1659,9 +1685,10 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Reverse operation to
-     * {@link #putOutputTablesIntoGlobalRepository(WorkflowDataRepository)}. It will remove
-     * all output tables and its delegates from the global table repository.
+    /**
+     * Reverse operation to {@link #putOutputTablesIntoGlobalRepository(WorkflowDataRepository)}. It will remove all
+     * output tables and its delegates from the global table repository.
+     *
      * @param dataRepository The global table rep.
      * @return The number of tables effectively removed, used for assertions.
      * @since 3.7
@@ -1679,15 +1706,13 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Delegate method to allow access to the (package scope) method
-     * {@link ExecutionContext#getLocalTableRepository()}. Called after
-     * execution has finished to clean up temporary tables.
+     * Delegate method to allow access to the (package scope) method {@link ExecutionContext#getLocalTableRepository()}.
+     * Called after execution has finished to clean up temporary tables.
      *
      * @param c To access.
      * @return Its local table repository.
      */
-    public static HashMap<Integer, ContainerTable> getLocalTableRepositoryFromContext(
-            final ExecutionContext c) {
+    public static HashMap<Integer, ContainerTable> getLocalTableRepositoryFromContext(final ExecutionContext c) {
         return c.getLocalTableRepository();
     }
 
@@ -1733,9 +1758,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Sets all (new) incoming <code>DataTableSpec</code> elements in the
-     * model, calls the model to create output table specs and propagates these
-     * new specs to the connected successors.
+     * Sets all (new) incoming <code>DataTableSpec</code> elements in the model, calls the model to create output table
+     * specs and propagates these new specs to the connected successors.
      *
      * @param inSpecs the tablespecs from the predecessors
      * @return flag indicating success of configure
@@ -1745,20 +1769,18 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Allows passing an object that may modify the specs created by the
-     * {@link NodeModel}, for example in case the node is wrapped and the
-     * output is modified.
+     * Allows passing an object that may modify the specs created by the {@link NodeModel}, for example in case the node
+     * is wrapped and the output is modified.
      *
      * @param rawInSpecs table specs from the predecessors
-     * @param configureHelper object called after node model calculated output
-     *            specs
+     * @param configureHelper object called after node model calculated output specs
      * @return true if configure finished successfully.
      * @noreference This method is not intended to be referenced by clients.
      */
     public boolean configure(final PortObjectSpec[] rawInSpecs, final NodeConfigureHelper configureHelper) {
         boolean success = false;
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
         synchronized (m_configureLock) {
             // reset message object
             clearNodeMessageAndNotify();
@@ -1771,8 +1793,7 @@ public final class Node implements NodeModelWarningListener {
                 m_outputs[p].spec = null;
             }
 
-            PortObjectSpec[] newOutSpec =
-                new PortObjectSpec[getNrOutPorts() - 1];
+            PortObjectSpec[] newOutSpec = new PortObjectSpec[getNrOutPorts() - 1];
             try {
                 // check the inspecs against null
                 for (int i = 0; i < inSpecs.length; i++) {
@@ -1866,8 +1887,7 @@ public final class Node implements NodeModelWarningListener {
                     createWarningMessageAndNotify(ise.getMessage(), ise);
                 }
             } catch (Throwable t) {
-                String error = "Configure failed (" + t.getClass().getSimpleName() + "): "
-                    + t.getMessage();
+                String error = "Configure failed (" + t.getClass().getSimpleName() + "): " + t.getMessage();
                 createErrorMessageAndNotify(error, t);
             }
         }
@@ -1877,12 +1897,15 @@ public final class Node implements NodeModelWarningListener {
         return success;
     }
 
-    /** Invokes protected method NodeModel#configureModel. Isolated in a
-     * separate method call as it may be (ab)used by other executors.
+    /**
+     * Invokes protected method NodeModel#configureModel. Isolated in a separate method call as it may be (ab)used by
+     * other executors.
+     *
      * @param inSpecs The input data to the node (excluding flow var port)
      * @return The output of node
      * @throws InvalidSettingsException An exception thrown by the client.
-     * @since 2.6 */
+     * @since 2.6
+     */
     public PortObjectSpec[] invokeNodeModelConfigure(final PortObjectSpec[] inSpecs) throws InvalidSettingsException {
         PortObjectSpec[] newOutSpec;
         newOutSpec = m_model.configureModel(inSpecs);
@@ -1929,6 +1952,7 @@ public final class Node implements NodeModelWarningListener {
 
     /**
      * Returns true if this node can show an interactive view.
+     *
      * @return <code>true</code> if interactive view is available.
      * @since 2.8
      */
@@ -1944,6 +1968,7 @@ public final class Node implements NodeModelWarningListener {
 
     /**
      * Returns true if this node can provide the content for an interactive web view.
+     *
      * @return <code>true</code> if is wizard node.
      * @since 2.9
      */
@@ -1978,8 +2003,9 @@ public final class Node implements NodeModelWarningListener {
      * @return The node view with the specified index.
      * @since 2.8
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public <V extends AbstractNodeView<?> & InteractiveView<?, ? extends ViewContent, ? extends ViewContent>> V getInteractiveView(final String title) {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public <V extends AbstractNodeView<?> & InteractiveView<?, ? extends ViewContent, ? extends ViewContent>> V
+        getInteractiveView(final String title) {
         LOGGER.assertLog(NodeContext.getContext() != null,
             "No node context available, please check call hierarchy and fix it");
 
@@ -1998,9 +2024,9 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Returns true if this node can show a dialog. This is the case either,
-     * if the node implementation provides a dialog, if the node has output
-     * ports, or if more than one job managers are available.
+     * Returns true if this node can show a dialog. This is the case either, if the node implementation provides a
+     * dialog, if the node has output ports, or if more than one job managers are available.
+     *
      * @return <code>true</code> if a dialog is available.
      */
     public boolean hasDialog() {
@@ -2023,20 +2049,16 @@ public final class Node implements NodeModelWarningListener {
 
     /**
      * @param inSpecs The input specs, which will be forwarded to the dialog's
-     *        {@link NodeDialogPane#loadSettingsFrom(NodeSettingsRO,
-     *        PortObjectSpec[])}.
+     *            {@link NodeDialogPane#loadSettingsFrom(NodeSettingsRO, PortObjectSpec[])}.
      * @param inData the input data if available (can be <code>null</code>)
-     * @param settings The current settings of this node. The settings object
-     *        will also contain the settings of the outer SNC.
+     * @param settings The current settings of this node. The settings object will also contain the settings of the
+     *            outer SNC.
      * @param isWriteProtected Whether write protected, see
-     *        {@link org.knime.core.node.workflow.WorkflowManager#isWriteProtected()}.
-     * @return The dialog pane which holds all the settings' components. In
-     *         addition this method loads the settings from the model into the
-     *         dialog pane.
-     * @throws NotConfigurableException if the dialog cannot be opened because
-     *             of real invalid settings or if any preconditions are not
-     *             fulfilled, e.g. no predecessor node, no nominal column in
-     *             input table, etc.
+     *            {@link org.knime.core.node.workflow.WorkflowManager#isWriteProtected()}.
+     * @return The dialog pane which holds all the settings' components. In addition this method loads the settings from
+     *         the model into the dialog pane.
+     * @throws NotConfigurableException if the dialog cannot be opened because of real invalid settings or if any
+     *             preconditions are not fulfilled, e.g. no predecessor node, no nominal column in input table, etc.
      * @throws IllegalStateException If node has no dialog.
      * @see #hasDialog()
      * @since 2.6
@@ -2047,8 +2069,8 @@ public final class Node implements NodeModelWarningListener {
         for (int i = 0; i < inPortTypes.length; i++) {
             inPortTypes[i] = m_inputs[i].getType();
         }
-        return initDialogPaneWithSettings(getDialogPane(), inSpecs, inPortTypes, inData, settings,
-            isWriteProtected, m_model, getFlowObjectStack(), getCredentialsProvider());
+        return initDialogPaneWithSettings(getDialogPane(), inSpecs, inPortTypes, inData, settings, isWriteProtected,
+            m_model, getFlowObjectStack(), getCredentialsProvider());
     }
 
     /**
@@ -2130,10 +2152,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Get reference to the node dialog instance. Used to get the user settings
-     * from the dialog without overwriting them as in
-     * {@link #getDialogPaneWithSettings(PortObjectSpec[],
-     * PortObject[], NodeSettingsRO, boolean)}.
+     * Get reference to the node dialog instance. Used to get the user settings from the dialog without overwriting them
+     * as in {@link #getDialogPaneWithSettings(PortObjectSpec[], PortObject[], NodeSettingsRO, boolean)}.
      *
      * @return Reference to dialog pane.
      * @throws IllegalStateException If node has no dialog.
@@ -2203,8 +2223,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Calls {@link NodeModel#saveSettingsTo(NodeSettingsWO)}. Used by 3rd party executor to clone nodes.
-     * <b>Note:</b> The KNIME core code is using {@link #saveModelSettingsTo(NodeSettingsWO)} instead.
+     * Calls {@link NodeModel#saveSettingsTo(NodeSettingsWO)}. Used by 3rd party executor to clone nodes. <b>Note:</b>
+     * The KNIME core code is using {@link #saveModelSettingsTo(NodeSettingsWO)} instead.
      *
      * @param modelSettings a settings object to save to (contains
      * @noreference This method is not intended to be referenced by clients.
@@ -2229,7 +2249,7 @@ public final class Node implements NodeModelWarningListener {
      */
     public void saveModelSettingsTo(final NodeSettingsWO modelSettings) {
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
 
         /* Note the comment in method loadSettingsFrom(NodeSettingsROf) */
         try {
@@ -2241,19 +2261,19 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Call {@link NodeModel#saveInternals(File, ExecutionMonitor)} and handles errors by logging to the NodeLogger
-     * or setting a warning message at the node.
+    /**
+     * Call {@link NodeModel#saveInternals(File, ExecutionMonitor)} and handles errors by logging to the NodeLogger or
+     * setting a warning message at the node.
+     *
      * @param internDir ...
      * @param exec ...
      * @throws CanceledExecutionException ...
      * @noreference This method is not intended to be referenced by clients.
      */
     // Called by 3rd party executor
-    public void saveInternals(final File internDir, final ExecutionMonitor exec)
-            throws CanceledExecutionException {
+    public void saveInternals(final File internDir, final ExecutionMonitor exec) throws CanceledExecutionException {
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
-
+            "No node context available, please check call hierarchy and fix it");
 
         if (internDir.exists()) {
             FileUtil.deleteRecursively(internDir);
@@ -2275,28 +2295,27 @@ public final class Node implements NodeModelWarningListener {
                     errMsg = "I/O error while saving internals: " + details;
                 } else {
                     errMsg = "Unable to save internals: " + details;
-                    LOGGER.coding("saveInternals() "
-                            + "should only cause IOException.", t);
+                    LOGGER.coding("saveInternals() " + "should only cause IOException.", t);
                 }
                 createErrorMessageAndNotify(errMsg, t);
             }
         } else {
-            String errorMessage =
-                    "Unable to write directory: " + internDir.getAbsolutePath();
+            String errorMessage = "Unable to write directory: " + internDir.getAbsolutePath();
             createErrorMessageAndNotify(errorMessage);
         }
     }
 
-    /** Call {@link NodeModel#loadInternals(File, ExecutionMonitor)} and handles errors by logging to the NodeLogger
-     * or setting a warning message at the node.
+    /**
+     * Call {@link NodeModel#loadInternals(File, ExecutionMonitor)} and handles errors by logging to the NodeLogger or
+     * setting a warning message at the node.
+     *
      * @param internDir ...
      * @param exec ...
      * @throws CanceledExecutionException ...
      * @noreference This method is not intended to be referenced by clients.
      */
     // Called by 3rd party executor
-    public void loadInternals(final File internDir, final ExecutionMonitor exec)
-            throws CanceledExecutionException {
+    public void loadInternals(final File internDir, final ExecutionMonitor exec) throws CanceledExecutionException {
         LOGGER.assertLog(NodeContext.getContext() != null,
             "No node context available, please check call hierarchy and fix it");
 
@@ -2310,33 +2329,28 @@ public final class Node implements NodeModelWarningListener {
                 if (e.getMessage() != null && e.getMessage().length() > 0) {
                     details = e.getMessage();
                 }
-                createErrorMessageAndNotify("Unable to load internals: "
-                        + details, e);
+                createErrorMessageAndNotify("Unable to load internals: " + details, e);
                 if (!(e instanceof IOException)) {
-                    LOGGER.coding("loadInternals() "
-                            + "should only cause IOException.", e);
+                    LOGGER.coding("loadInternals() " + "should only cause IOException.", e);
                 }
             }
         }
     }
 
     /**
-     * Adds a state listener to this node. Ignored, if the listener is already
-     * registered.
+     * Adds a state listener to this node. Ignored, if the listener is already registered.
      *
      * @param listener The listener to add.
      */
     public void addMessageListener(final NodeMessageListener listener) {
         if (listener == null) {
-            throw new IllegalArgumentException(
-                    "Node message listener must not be null!");
+            throw new IllegalArgumentException("Node message listener must not be null!");
         }
         m_messageListeners.add(listener);
     }
 
     /**
-     * Removes a state listener from this node. Ignored, if the listener is not
-     * registered.
+     * Removes a state listener from this node. Ignored, if the listener is not registered.
      *
      * @param listener The listener to remove.
      */
@@ -2355,8 +2369,7 @@ public final class Node implements NodeModelWarningListener {
         // fire event to all listeners
         for (NodeMessageListener listener : m_messageListeners) {
             try {
-                listener.messageChanged(new NodeMessageEvent(
-                        new NodeID(0), message));
+                listener.messageChanged(new NodeMessageEvent(new NodeID(0), message));
             } catch (Throwable t) {
                 LOGGER.error("Exception while notifying node listeners", t);
             }
@@ -2370,14 +2383,12 @@ public final class Node implements NodeModelWarningListener {
      */
     @Override
     public String toString() {
-        return "Node @" + hashCode() + " [" + m_name + ";in="
-                + m_inputs.length + ";out=" + m_outputs.length + "]";
+        return "Node @" + hashCode() + " [" + m_name + ";in=" + m_inputs.length + ";out=" + m_outputs.length + "]";
     }
 
     /**
-     * NOTE: it is not recommended to call this method anywhere else than in them
-     * core. The port indices in the factory don't encounter for the implicit
-     * flow variable ports!
+     * NOTE: it is not recommended to call this method anywhere else than in them core. The port indices in the factory
+     * don't encounter for the implicit flow variable ports!
      *
      * @return the <code>NodeFactory</code> that constructed this node.
      * @noreference This method is not intended to be referenced by clients.
@@ -2398,8 +2409,9 @@ public final class Node implements NodeModelWarningListener {
         return (m_model instanceof InterruptibleNodeModel);
     }
 
-    /** Ensures that any port object is read for later saving with a
-     * newer version. */
+    /**
+     * Ensures that any port object is read for later saving with a newer version.
+     */
     public void ensureOutputDataIsRead() {
         for (Output p : m_outputs) {
             if (p.object instanceof BufferedDataTable) {
@@ -2411,44 +2423,46 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Exposes {@link BufferedDataTable#ensureOpen()} as public method. This
-     * method has been added here in order to keep the scope of the above method
-     * at a minimum.
+    /**
+     * Exposes {@link BufferedDataTable#ensureOpen()} as public method. This method has been added here in order to keep
+     * the scope of the above method at a minimum.
+     *
      * @param table To invoke this method on.
      */
     public static void invokeEnsureOpen(final BufferedDataTable table) {
         table.ensureOpen();
     }
 
-    /** Widens scope of {@link AbstractNodeView#openView(String, Rectangle)} method so it
-     * can be called from UI framework components. This method is not meant for
-     * public use and may change in future versions.
+    /**
+     * Widens scope of {@link AbstractNodeView#openView(String, Rectangle)} method so it can be called from UI framework
+     * components. This method is not meant for public use and may change in future versions.
+     *
      * @param view The view to call the method on.
      * @param title The title for the view (method argument).
      */
-    public static void invokeOpenView(final AbstractNodeView<?> view,
-            final String title) {
+    public static void invokeOpenView(final AbstractNodeView<?> view, final String title) {
         invokeOpenView(view, title, null);
     }
 
-    /** Widens scope of {@link AbstractNodeView#openView(String, Rectangle)} method so it
-     * can be called from UI framework components. This method is not meant for
-     * public use and may change in future versions.
+    /**
+     * Widens scope of {@link AbstractNodeView#openView(String, Rectangle)} method so it can be called from UI framework
+     * components. This method is not meant for public use and may change in future versions.
+     *
      * @param view The view to call the method on.
      * @param title The title for the view (method argument).
-     * @param knimeWindowBounds Bounds of the KNIME window, used to calculate
-     * the center which will also be the center of the opened view. If null the
-     * center of the primary monitor is used.
+     * @param knimeWindowBounds Bounds of the KNIME window, used to calculate the center which will also be the center
+     *            of the opened view. If null the center of the primary monitor is used.
      * @since 2.12
      */
-    public static void invokeOpenView(final AbstractNodeView<?> view,
-            final String title, final Rectangle knimeWindowBounds) {
+    public static void invokeOpenView(final AbstractNodeView<?> view, final String title,
+        final Rectangle knimeWindowBounds) {
         view.openView(title, knimeWindowBounds);
     }
 
-    /** Widens scope of internalLoadSettingsFrom method in
-     * {@link NodeDialogPane}. Framework method, not to be called by node
-     * implementations.
+    /**
+     * Widens scope of internalLoadSettingsFrom method in {@link NodeDialogPane}. Framework method, not to be called by
+     * node implementations.
+     *
      * @param pane forwarded
      * @param settings forwarded
      * @param specs forwarded
@@ -2459,17 +2473,15 @@ public final class Node implements NodeModelWarningListener {
      * @throws NotConfigurableException forwarded
      * @since 2.6
      */
-    public static void invokeDialogInternalLoad(final NodeDialogPane pane,
-            final NodeSettingsRO settings, final PortObjectSpec[] specs,
-            final PortObject[] data, final FlowObjectStack foStack,
-            final CredentialsProvider credentialsProvider,
-            final boolean isWriteProtected) throws NotConfigurableException {
-        pane.internalLoadSettingsFrom(settings, specs, data, foStack,
-                credentialsProvider, isWriteProtected);
+    public static void invokeDialogInternalLoad(final NodeDialogPane pane, final NodeSettingsRO settings,
+        final PortObjectSpec[] specs, final PortObject[] data, final FlowObjectStack foStack,
+        final CredentialsProvider credentialsProvider, final boolean isWriteProtected) throws NotConfigurableException {
+        pane.internalLoadSettingsFrom(settings, specs, data, foStack, credentialsProvider, isWriteProtected);
     }
 
     /**
      * Adds the misc tab to dialogs.
+     *
      * @param dialogPane
      * @noreference This method is not intended to be referenced by clients. No public API.
      */
@@ -2477,9 +2489,10 @@ public final class Node implements NodeModelWarningListener {
         dialogPane.addMiscTab();
     }
 
-    /** Widens scope of {@link AbstractNodeView#closeView()} method so it
-     * can be called from UI framework components. This method is not meant for
-     * public use and may change in future versions.
+    /**
+     * Widens scope of {@link AbstractNodeView#closeView()} method so it can be called from UI framework components.
+     * This method is not meant for public use and may change in future versions.
+     *
      * @param view The view to call the method on.
      */
     public static void invokeCloseView(final AbstractNodeView<?> view) {
@@ -2490,8 +2503,7 @@ public final class Node implements NodeModelWarningListener {
     // FlowObjectStack handling
     // ////////////////////////
 
-    public void setFlowObjectStack(final FlowObjectStack scsc,
-            final FlowObjectStack outgoingFlowObjectStack) {
+    public void setFlowObjectStack(final FlowObjectStack scsc, final FlowObjectStack outgoingFlowObjectStack) {
         m_model.setFlowObjectStack(scsc, outgoingFlowObjectStack);
     }
 
@@ -2499,9 +2511,10 @@ public final class Node implements NodeModelWarningListener {
         return m_model.getFlowObjectStack();
     }
 
-    /** Get list of flow variables that are added by NodeModel implementation.
-     * @return The stack of flow variables that the node added in its client
-     *         code (configure &amp; execute).
+    /**
+     * Get list of flow variables that are added by NodeModel implementation.
+     *
+     * @return The stack of flow variables that the node added in its client code (configure &amp; execute).
      */
     public FlowObjectStack getOutgoingFlowObjectStack() {
         return m_model.getOutgoingFlowObjectStack();
@@ -2518,7 +2531,9 @@ public final class Node implements NodeModelWarningListener {
 
     /** Possible roles of loop roles. */
     @Deprecated
-    public static enum LoopRole { BEGIN, END, NONE }
+    public static enum LoopRole {
+            BEGIN, END, NONE
+    }
 
     /**
      * @return role of loop node.
@@ -2534,7 +2549,8 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Clear loop context member of NodeModel.
+    /**
+     * Clear loop context member of NodeModel.
      */
     public void clearLoopContext() {
         m_model.clearLoopContext();
@@ -2573,7 +2589,8 @@ public final class Node implements NodeModelWarningListener {
         m_model.setPauseLoopExecution(ple);
     }
 
-    /** Make model aware of corresponding LoopEndNode.
+    /**
+     * Make model aware of corresponding LoopEndNode.
      *
      * @param tail the node.
      */
@@ -2588,7 +2605,8 @@ public final class Node implements NodeModelWarningListener {
         }
     }
 
-    /** Make model aware of corresponding LoopStartNode.
+    /**
+     * Make model aware of corresponding LoopStartNode.
      *
      * @param head the node.
      */
@@ -2626,17 +2644,18 @@ public final class Node implements NodeModelWarningListener {
      */
     public boolean resetAndConfigureLoopBody() {
         LOGGER.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
+            "No node context available, please check call hierarchy and fix it");
 
         return getNodeModel().resetAndConfigureLoopBody();
     }
-
 
     // ////////////////////////
     // Credentials handling
     // ////////////////////////
 
-    /** Sets credentials in model.
+    /**
+     * Sets credentials in model.
+     *
      * @param provider provider to set.
      */
     public void setCredentialsProvider(final CredentialsProvider provider) {
@@ -2647,6 +2666,5 @@ public final class Node implements NodeModelWarningListener {
     public CredentialsProvider getCredentialsProvider() {
         return m_model.getCredentialsProvider();
     }
-
 
 }
