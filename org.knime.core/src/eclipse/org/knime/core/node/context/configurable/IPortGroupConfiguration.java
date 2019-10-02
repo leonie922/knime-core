@@ -48,10 +48,13 @@
  */
 package org.knime.core.node.context.configurable;
 
-
 import java.util.Optional;
 import java.util.function.Predicate;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.port.PortType;
 
 /**
@@ -61,24 +64,9 @@ import org.knime.core.node.port.PortType;
  */
 public interface IPortGroupConfiguration {
 
-    public enum PortGroupConfigType {
+    public void save(final NodeSettingsWO settings);
 
-                    INPUT("input ports"), OUTPUT("output ports"), BOTH("input and output ports");
-
-        private final String m_desc;
-
-        private PortGroupConfigType(final String desc) {
-            m_desc = "Reconfigure " + desc;
-        }
-
-        public String getDescription() {
-            return m_desc;
-        }
-    }
-
-    public enum GroupType {
-            FIXED, SINGLETON, MULTI_INSTANCE;
-    }
+    public void load(final NodeSettingsRO settings) throws InvalidSettingsException;
 
     public String getGroupName();
 
@@ -86,15 +74,23 @@ public interface IPortGroupConfiguration {
 
     public Optional<PortType[]> getRequiredPorts();
 
-    public PortGroupConfigType getGroupConfigType();
+    public Optional<PortType[]> getConfiguredPorts();
 
-    public GroupType getGroupType();
+    default public PortType[] getPorts() {
+        return ArrayUtils.addAll(getRequiredPorts().orElse(new PortType[0]),
+            getConfiguredPorts().orElse(new PortType[0]));
+    }
+
+    public int maxNumAdditionalPorts();
+
+    public boolean modifiableInputPorts();
+
+    public boolean modifiableOutputPorts();
 
     public Predicate<PortType> acceptsPort();
 
-    public PortType[] getConfiguredPorts();
+    public void addPort(final PortType port);
 
-    public void setPorts(final PortType[] ports);
-
+    public void removePort(final int idx);
 
 }

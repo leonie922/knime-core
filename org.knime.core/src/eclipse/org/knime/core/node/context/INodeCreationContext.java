@@ -48,11 +48,19 @@
  */
 package org.knime.core.node.context;
 
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
+
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
 public interface INodeCreationContext {
+
+    public void save(final NodeSettingsWO settings);
+
+    public void load(final NodeSettingsRO settings) throws InvalidSettingsException;
 
 }

@@ -61,6 +61,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -248,6 +249,8 @@ public final class Node implements NodeModelWarningListener {
     // cases then
     private final Object m_configureLock = new Object();
 
+    private final INodeCreationContext m_context;
+
     /**
      * Creates a new node by retrieving the model, dialog, and views, from the
      * specified <code>NodeFactory</code>. Also initializes the input and output
@@ -277,6 +280,7 @@ public final class Node implements NodeModelWarningListener {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
         m_factory = nodeFactory;
+        m_context = context;
         m_name = m_factory.getNodeName().intern();
         m_model = m_factory.callCreateNodeModel(context);
         m_model.addWarningListener(this);
@@ -331,6 +335,7 @@ public final class Node implements NodeModelWarningListener {
         loadDataAndInternals(loader, exec, loadResult);
         exec.setProgress(1.0);
     }
+
 
     /**
      * Creates an execution result containing all calculated values in a
@@ -666,6 +671,15 @@ public final class Node implements NodeModelWarningListener {
      */
     public String getName() {
         return m_name;
+    }
+
+    /**
+     * Returns the creation context of this node.
+     *
+     * @return the creation context
+     */
+    public Optional<INodeCreationContext> getContext() {
+        return Optional.ofNullable(m_context);
     }
 
     /**

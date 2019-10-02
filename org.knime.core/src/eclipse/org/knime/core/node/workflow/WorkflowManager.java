@@ -753,6 +753,7 @@ public final class WorkflowManager extends NodeContainer
                 new NativeNodeContainer(this, new Node((NodeFactory<NodeModel>)factory, context), newID);
             addNodeContainer(container, true);
             configureNodeAndSuccessors(newID, true);
+            // TODO: MARK check if we still have to do this
             if (context != null) { // save node settings if source URL/context was provided (bug 5772)
                 container.saveNodeSettingsToDefault();
             }

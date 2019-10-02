@@ -44,6 +44,7 @@
  */
 package org.knime.core.node;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 
 import org.knime.core.node.context.IURLCreationContext;
@@ -55,7 +56,16 @@ import org.knime.core.node.context.IURLCreationContext;
  */
 public class NodeCreationContext implements IURLCreationContext {
 
-    private final URL m_url;
+    private URL m_url;
+
+    /**
+     * Default URL constructor.
+     *
+     * @noreference This constructor is not intended to be referenced by clients.
+     */
+    public NodeCreationContext() {
+        this(null);
+    }
 
     /**
      * Constructor.
@@ -72,5 +82,24 @@ public class NodeCreationContext implements IURLCreationContext {
     @Override
     public URL getUrl() {
         return m_url;
+    }
+
+    @Override
+    public void save(final NodeSettingsWO settings) {
+        if (m_url != null) {
+            settings.addString("url", m_url.toString());
+        }
+    }
+
+    @Override
+    public void load(final NodeSettingsRO settings) throws InvalidSettingsException {
+        if (settings.containsKey("url")) {
+            try {
+                m_url = new URL(settings.getString("url"));
+            } catch (MalformedURLException ex) {
+                throw new InvalidSettingsException(
+                    "The value " + settings.getString("url") + " does not encode a valid URL", ex.getCause());
+            }
+        }
     }
 }

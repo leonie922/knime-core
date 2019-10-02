@@ -57,11 +57,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.knime.core.eclipseUtil.GlobalClassCreator;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.ConfigurableNodeFactory;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.FileNodePersistor;
 import org.knime.core.node.InvalidSettingsException;
@@ -75,6 +77,7 @@ import org.knime.core.node.NodePersistor.LoadNodeModelSettingsFailPolicy;
 import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.context.INodeCreationContext;
 import org.knime.core.node.missing.MissingNodeFactory;
 import org.knime.core.node.port.PortObject;
 import org.knime.core.node.port.PortType;
@@ -89,6 +92,11 @@ import org.knime.core.util.LoadVersion;
  */
 public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPersistor
     implements NativeNodeContainerPersistor {
+
+    /**
+     *
+     */
+    private static final String NODE_CREATION_CONTEXT = "node_creation_context";
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(FileNativeNodeContainerPersistor.class);
 
@@ -205,7 +213,9 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
             throw new NodeFactoryUnknownException(error, nodeInfo, additionalFactorySettings, e);
         }
         m_nodeAndBundleInformation = nodeInfo;
-        m_node = new Node(nodeFactory);
+
+        m_node = new Node(nodeFactory,loadCreationContext(settings, nodeFactory).orElse(null));
+
     }
 
     /** {@inheritDoc} */
@@ -352,6 +362,21 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
             }
             throw ex;
         }
+    }
+
+    private static Optional<INodeCreationContext> loadCreationContext(final NodeSettingsRO settings,
+        final NodeFactory<?> factory) throws InvalidSettingsException {
+        if (settings.containsKey(NODE_CREATION_CONTEXT)) {
+            final INodeCreationContext creationContext =
+                ((ConfigurableNodeFactory<?, ?>)factory).createCreationContext();
+            try {
+            creationContext.load(settings.getNodeSettings(NODE_CREATION_CONTEXT));
+            } catch(final InvalidSettingsException e) {
+                throw new InvalidSettingsException("Unable to load creation context", e.getCause());
+            }
+            return Optional.of(creationContext);
+        }
+        return Optional.empty();
     }
 
     /** {@inheritDoc} */
@@ -512,9 +537,11 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
         final ExecutionMonitor execMon, final ReferencedFile nodeDirRef,
         final boolean isSaveData) throws IOException, CanceledExecutionException {
         saveNodeFactory(settings, nnc);
+        saveCreationContext(settings, nnc.getNode());
         FileNodePersistor.save(nnc, settings, execMon, nodeDirRef,
             isSaveData && nnc.getInternalState().equals(InternalNodeContainerState.EXECUTED));
     }
+
 
     private static void saveNodeFactory(final NodeSettingsWO settings, final NativeNodeContainer nnc) {
         final Node node = nnc.getNode();
@@ -526,4 +553,14 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
         node.getFactory().saveAdditionalFactorySettings(subSets);
     }
 
+    /**
+     * @param settings
+     * @param node
+     */
+    private static void saveCreationContext(final NodeSettingsWO settings, final Node node) {
+        node.getContext().ifPresent(c -> {
+            final NodeSettingsWO contextSettings = settings.addNodeSettings(NODE_CREATION_CONTEXT);
+            c.save(contextSettings);
+        });
+    }
 }

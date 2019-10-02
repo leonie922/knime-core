@@ -48,7 +48,9 @@
  */
 package org.knime.core.node.context;
 
-import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.knime.core.node.context.configurable.IPortGroupConfiguration;
 import org.knime.core.node.port.PortType;
@@ -60,19 +62,27 @@ import org.knime.core.node.port.PortType;
  */
 public interface IConfigurablePortsCreationContext extends INodeCreationContext {
 
-    public Collection<IPortGroupConfiguration> getGroupConfigurations();
+    public Map<String, IPortGroupConfiguration> getGroupConfigurations();
 
-    default public PortType[][] getInputPorts() {
-        return null;
-//        return getGroupConfigurations().stream()
-//            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.OUTPUT)
-//            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+    default public Map<String, PortType[]> getInputPortGroups() {
+        return getGroupConfigurations().entrySet().stream()//
+            .filter(entry -> entry.getValue().modifiableInputPorts())//
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getPorts()));
     }
 
-    default public PortType[][] getOutputPorts() {
-        return null;
-//        return getGroupConfigurations().stream()
-//            .filter(p -> p.getConfigType() != IPortGroupConfiguration.PortGroupConfigType.INPUT)
-//            .map(IPortGroupConfiguration::getConfiguredPorts).toArray(PortType[][]::new);
+    default public Map<String, PortType[]> getOutputPortGroups() {
+        return getGroupConfigurations().entrySet().stream()//
+            .filter(entry -> entry.getValue().modifiableOutputPorts())//
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getPorts()));
+
     }
+
+    default public PortType[] getInputPorts() {
+        return getInputPortGroups().values().stream().flatMap(Stream::of).toArray(PortType[]::new);
+    }
+
+    default public PortType[] getOutputPorts() {
+        return getOutputPortGroups().values().stream().flatMap(Stream::of).toArray(PortType[]::new);
+    }
+
 }
