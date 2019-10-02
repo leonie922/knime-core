@@ -59,10 +59,10 @@ import org.knime.core.node.context.IConfigurablePortsCreationContext;
  * @since 4.1
  */
 public abstract class ConfigurablePortsNodeFactory<T extends NodeModel>
-    extends ConfigurableNodeFactory<T, IConfigurablePortsCreationContext<?>> {
+    extends ConfigurableNodeFactory<T, IConfigurablePortsCreationContext> {
 
 
-    public abstract IConfigurablePortsCreationContext<?> createCreationContext();
+    public abstract IConfigurablePortsCreationContext createCreationContext();
 
     @Override
     public final T createNodeModel() {

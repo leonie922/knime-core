@@ -54,7 +54,7 @@ import org.knime.core.node.context.IURLCreationContext;
  *
  * @author ohl, University of Konstanz
  */
-public class NodeCreationContext implements IURLCreationContext<NodeCreationContext> {
+public class NodeCreationContext implements IURLCreationContext {
 
     private URL m_url;
 
@@ -107,7 +107,7 @@ public class NodeCreationContext implements IURLCreationContext<NodeCreationCont
      * @since 4.1
      */
     @Override
-    public NodeCreationContext cloneIt() {
+    public NodeCreationContext deepCopy() {
         return new NodeCreationContext(m_url);
     }
 }

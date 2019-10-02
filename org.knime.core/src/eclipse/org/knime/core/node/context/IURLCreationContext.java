@@ -55,11 +55,15 @@ import java.net.URL;
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
-public interface IURLCreationContext<C extends IURLCreationContext<C>> extends INodeCreationContext<C> {
+public interface IURLCreationContext extends INodeCreationContext {
 
     /**
      * @return the url
      */
     public URL getUrl();
+
+    @Override
+    IURLCreationContext deepCopy();
+
 
 }

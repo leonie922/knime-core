@@ -269,7 +269,7 @@ public final class Node implements NodeModelWarningListener {
     // cases then
     private final Object m_configureLock = new Object();
 
-    private final INodeCreationContext<?> m_context;
+    private final INodeCreationContext m_context;
 
     /**
      * Creates a new node by retrieving the model, dialog, and views, from the specified <code>NodeFactory</code>. Also
@@ -292,7 +292,7 @@ public final class Node implements NodeModelWarningListener {
      * @param context the node creation context
      * @throws IllegalArgumentException If the <i>nodeFactory</i> is <code>null</code>.
      */
-    public Node(final NodeFactory<NodeModel> nodeFactory, final INodeCreationContext<?> context) {
+    public Node(final NodeFactory<NodeModel> nodeFactory, final INodeCreationContext context) {
         if (nodeFactory == null) {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
@@ -694,7 +694,7 @@ public final class Node implements NodeModelWarningListener {
      */
     public Optional<INodeCreationContext> getContext() {
         if (m_context != null) {
-            return Optional.of(m_context.cloneIt());
+            return Optional.of(m_context.deepCopy());
         }
         return Optional.ofNullable(m_factory instanceof ConfigurablePortsNodeFactory
             ? ((ConfigurablePortsNodeFactory<NodeModel>)m_factory).createCreationContext() : null);

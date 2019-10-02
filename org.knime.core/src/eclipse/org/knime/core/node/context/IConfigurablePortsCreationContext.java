@@ -60,10 +60,9 @@ import org.knime.core.node.port.PortType;
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
-public interface IConfigurablePortsCreationContext<C extends IConfigurablePortsCreationContext<C>>
-    extends INodeCreationContext<C> {
+public interface IConfigurablePortsCreationContext extends INodeCreationContext {
 
-    public Map<String, IPortGroupConfiguration<?>> getGroupConfigurations();
+    public Map<String, IPortGroupConfiguration> getGroupConfigurations();
 
     default public Map<String, PortType[]> getInputPortGroups() {
         return getGroupConfigurations().entrySet().stream()//
@@ -86,4 +85,6 @@ public interface IConfigurablePortsCreationContext<C extends IConfigurablePortsC
         return getOutputPortGroups().values().stream().flatMap(Stream::of).toArray(PortType[]::new);
     }
 
+    @Override
+    public IConfigurablePortsCreationContext deepCopy();
 }
