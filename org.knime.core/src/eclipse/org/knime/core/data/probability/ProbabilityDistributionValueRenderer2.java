@@ -173,7 +173,6 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
                 m_bars.add(
                     new ClassProbabilityBar(new ClassProbability(probDistrValue.getProbability(i), probClasses.get(i))));
             }
-
 //            Icon icon = getIcon();
 //            if (icon == null) {
 //                super.setIcon(m_icon);
