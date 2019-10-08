@@ -48,8 +48,11 @@
  */
 package org.knime.core.node.context;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Map.Entry;
 import java.util.stream.Stream;
 
 import org.knime.core.node.context.configurable.IPortGroupConfiguration;
@@ -64,27 +67,59 @@ public interface IConfigurablePortsCreationContext extends INodeCreationContext 
 
     public Map<String, IPortGroupConfiguration> getGroupConfigurations();
 
-    default public Map<String, PortType[]> getInputPortGroups() {
-        return getGroupConfigurations().entrySet().stream()//
-            .filter(entry -> entry.getValue().modifiableInputPorts())//
-            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getPorts()));
+    default public Map<String, Map<PortType, List<Integer>>> getInputPortGroups() {
+        final LinkedHashMap<String, Map<PortType, List<Integer>>> in = new LinkedHashMap<>();
+        int offset = 0;
+
+        for (Entry<String, IPortGroupConfiguration> entry : getGroupConfigurations().entrySet()) {
+            IPortGroupConfiguration value = entry.getValue();
+            if (value.definesInputPorts()) {
+                final LinkedHashMap<PortType, List<Integer>> typeToIndices = new LinkedHashMap<>();
+
+                for (final PortType pT : value.getPorts()) {
+                    if (!typeToIndices.containsKey(pT)) {
+                        typeToIndices.put(pT, new ArrayList<Integer>());
+                    }
+                    typeToIndices.get(pT).add(offset++);
+                }
+                in.put(entry.getKey(), typeToIndices);
+            }
+        }
+        return in;
     }
 
-    default public Map<String, PortType[]> getOutputPortGroups() {
-        return getGroupConfigurations().entrySet().stream()//
-            .filter(entry -> entry.getValue().modifiableOutputPorts())//
-            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getPorts()));
+    default public Map<String, Map<PortType, List<Integer>>> getOutputPortGroups() {
+        final LinkedHashMap<String, Map<PortType, List<Integer>>> out = new LinkedHashMap<>();
+        int offset = 0;
 
+        for (Entry<String, IPortGroupConfiguration> entry : getGroupConfigurations().entrySet()) {
+            IPortGroupConfiguration value = entry.getValue();
+            if (value.definesOutputPorts()) {
+                final LinkedHashMap<PortType, List<Integer>> typeToIndices = new LinkedHashMap<>();
+
+                for (final PortType pT : value.getPorts()) {
+                    if (!typeToIndices.containsKey(pT)) {
+                        typeToIndices.put(pT, new ArrayList<Integer>());
+                    }
+                    typeToIndices.get(pT).add(offset++);
+                }
+                out.put(entry.getKey(), typeToIndices);
+            }
+        }
+        return out;
     }
 
     default public PortType[] getInputPorts() {
-        return getInputPortGroups().values().stream().flatMap(Stream::of).toArray(PortType[]::new);
+        return getGroupConfigurations().values().stream().filter(IPortGroupConfiguration::definesInputPorts)
+            .map(IPortGroupConfiguration::getPorts).flatMap(Stream::of).toArray(PortType[]::new);
     }
 
     default public PortType[] getOutputPorts() {
-        return getOutputPortGroups().values().stream().flatMap(Stream::of).toArray(PortType[]::new);
+        return getGroupConfigurations().values().stream().filter(IPortGroupConfiguration::definesOutputPorts)
+                .map(IPortGroupConfiguration::getPorts).flatMap(Stream::of).toArray(PortType[]::new);
     }
 
-    @Override
-    public IConfigurablePortsCreationContext deepCopy();
+//    ROPortsConfigurationContext getInterface() {
+//        oijdwoiadwjoiadwj
+//    }
 }

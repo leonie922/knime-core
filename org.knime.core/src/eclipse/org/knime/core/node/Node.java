@@ -81,7 +81,6 @@ import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.NodeFactory.NodeType;
 import org.knime.core.node.context.INodeCreationContext;
-import org.knime.core.node.context.configurable.ConfigurablePortsNodeFactory;
 import org.knime.core.node.dialog.ValueControlledDialogPane;
 import org.knime.core.node.dialog.ValueControlledNode;
 import org.knime.core.node.interactive.InteractiveNode;
@@ -297,8 +296,12 @@ public final class Node implements NodeModelWarningListener {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
         m_factory = nodeFactory;
-        m_context = context;
         m_name = m_factory.getNodeName().intern();
+        if (context == null && m_factory instanceof ConfigurableNodeFactory) {
+            m_context = ((ConfigurableNodeFactory<?,?>)m_factory).createCreationContext();
+        } else {
+            m_context = context;
+        }
         m_model = m_factory.callCreateNodeModel(context);
         m_model.addWarningListener(this);
         m_messageListeners = new CopyOnWriteArraySet<NodeMessageListener>();
@@ -696,8 +699,7 @@ public final class Node implements NodeModelWarningListener {
         if (m_context != null) {
             return Optional.of(m_context.deepCopy());
         }
-        return Optional.ofNullable(m_factory instanceof ConfigurablePortsNodeFactory
-            ? ((ConfigurablePortsNodeFactory<NodeModel>)m_factory).createCreationContext() : null);
+        return Optional.empty();
     }
 
     /**

@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -43,46 +44,18 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   06.06.2011 (meinl): created
+ *   Oct 4, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.configurable;
+
+import org.knime.core.node.context.IConfigurablePortsCreationContext;
+import org.knime.core.node.context.IURLCreationContext;
 
 /**
- * This extension of {@link NodeFactory} is used in order to create a new node in a certain context. Implementors who
- * wish that their nodes can be used in a context (e.g. when a file is dropped onto the workflow editor) should extend
- * this class instead of {@link NodeFactory} and register the factory in the plugin.xml (in addition to the normal
- * registration).
  *
- * @param <T> any subclass of {@link NodeModel}
- * @author Thorsten Meinl, University of Konstanz
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-public abstract class ContextAwareNodeFactory<T extends NodeModel>
-    extends ConfigurableNodeFactory<T, NodeCreationContext> {
-
-    /**
-     * @since 4.1
-     */
-    @Override
-    public final NodeCreationContext createCreationContext() {
-        return null;
-    }
-
-    /**
-     * @since 4.1
-     */
-    @Override
-    protected final T createConfigurableNodeModel(final NodeCreationContext context) {
-        return createNodeModel(context);
-    }
-
-    /**
-     * Creates a new node model.
-     *
-     * @param context the context in which the node should be created
-     * @return a node model
-     */
-    @SuppressWarnings("deprecation")
-    @Override
-    public abstract T createNodeModel(final NodeCreationContext context);
+public interface Bla extends IURLCreationContext, IConfigurablePortsCreationContext{
 
 }

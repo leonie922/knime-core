@@ -62,8 +62,9 @@ public interface IURLCreationContext extends INodeCreationContext {
      */
     public URL getUrl();
 
-    @Override
-    IURLCreationContext deepCopy();
+
+
+    public void getURLContext();
 
 
 }

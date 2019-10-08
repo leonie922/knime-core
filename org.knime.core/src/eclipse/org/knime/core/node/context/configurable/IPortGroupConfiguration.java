@@ -64,10 +64,6 @@ import org.knime.core.node.port.PortType;
  */
 public interface IPortGroupConfiguration {
 
-    public void save(final NodeSettingsWO settings);
-
-    public void load(final NodeSettingsRO settings) throws InvalidSettingsException;
-
     public String getGroupName();
 
     public String getGroupDescription();
@@ -77,15 +73,10 @@ public interface IPortGroupConfiguration {
     public Optional<PortType[]> getConfiguredPorts();
 
     default public PortType[] getPorts() {
-        return ArrayUtils.addAll(getRequiredPorts().orElse(new PortType[0]),
+        final PortType[] arr = ArrayUtils.addAll(getRequiredPorts().orElse(new PortType[0]),
             getConfiguredPorts().orElse(new PortType[0]));
+        return arr;
     }
-
-    public int maxNumAdditionalPorts();
-
-    public boolean modifiableInputPorts();
-
-    public boolean modifiableOutputPorts();
 
     public Predicate<PortType> acceptsPort();
 
@@ -93,5 +84,22 @@ public interface IPortGroupConfiguration {
 
     public void removePort(final int idx);
 
+    public int maxNumAdditionalPorts();
+
+    public boolean modifiableInputPorts();
+
+    public boolean modifiableOutputPorts();
+
+    public boolean definesInputPorts();
+
+    public boolean definesOutputPorts();
+
+    public void save(final NodeSettingsWO settings);
+
+    public void load(final NodeSettingsRO settings) throws InvalidSettingsException;
+
+
     public IPortGroupConfiguration cloneIt();
+
+
 }
