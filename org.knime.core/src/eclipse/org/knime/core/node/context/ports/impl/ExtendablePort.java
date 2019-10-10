@@ -48,10 +48,15 @@
  */
 package org.knime.core.node.context.ports.impl;
 
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.stream.IntStream;
+
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExchangeablePort;
+import org.knime.core.node.context.ports.IExtendablePort;
 import org.knime.core.node.context.ports.IPortGroupConfiguration;
 import org.knime.core.node.port.PortType;
 
@@ -59,32 +64,34 @@ import org.knime.core.node.port.PortType;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class ExchangeablePort implements IExchangeablePort {
+public class ExtendablePort implements IExtendablePort {
 
-    private PortType m_curType;
+    private final PortType[] m_requiredPorts;
 
-    private final PortType[] m_supportedTypes;
+    private final List<PortType> m_configuredPorts;
 
     private final boolean m_definesInputPorts;
 
     private final boolean m_definesOutputPorts;
 
-    private ExchangeablePort(final PortType defaultType, final PortType[] supportedTypes,
+    ExtendablePort() {
+        m_requiredPorts = null;
+        m_configuredPorts = null;
+        m_definesInputPorts = false;
+        m_definesOutputPorts = false;
+    }
+
+    private ExtendablePort(final PortType[] requiredPorts, final List<PortType> configuredPorts,
         final boolean definesInputPorts, final boolean definesOutputPorts) {
-        m_curType = defaultType;
-        m_supportedTypes = supportedTypes;
+        m_requiredPorts = requiredPorts;
+        m_configuredPorts = configuredPorts;
         m_definesInputPorts = definesInputPorts;
         m_definesOutputPorts = definesOutputPorts;
     }
 
     @Override
-    public PortType[] getPorts() {
-        return new PortType[]{m_curType};
-    }
-
-    @Override
     public boolean definesInputPorts() {
-        return definesInputPorts();
+        return m_definesInputPorts;
     }
 
     @Override
@@ -94,27 +101,59 @@ public class ExchangeablePort implements IExchangeablePort {
 
     @Override
     public IPortGroupConfiguration copy() {
-        return new ExchangeablePort(m_curType, m_supportedTypes, m_definesInputPorts, m_definesOutputPorts);
+        return new ExtendablePort(m_requiredPorts.clone(), new ArrayList<PortType>(m_configuredPorts),
+            m_definesInputPorts, m_definesOutputPorts);
     }
 
     @Override
     public void saveSettingsTo(final NodeSettingsWO settings) {
-        m_curType.save(settings);
+        IntStream.range(0, m_configuredPorts.size()).forEach(idx -> m_configuredPorts.get(idx)//
+            .save(settings.addNodeSettings("port_" + idx)));
     }
 
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        m_curType = PortType.load(settings);
+        m_configuredPorts.clear();
+        @SuppressWarnings("unchecked")
+        Enumeration<NodeSettingsRO> children = settings.children();
+        while (children.hasMoreElements()) {
+            m_configuredPorts.add(PortType.load(children.nextElement()));
+        }
     }
 
     @Override
-    public PortType getSelectedPortType() {
-        return m_curType;
+    public boolean accepts(final PortType pType) {
+        return false;
     }
 
     @Override
-    public PortType[] getSupportedPortTypes() {
-        return m_supportedTypes;
+    public PortType[] getRequiredPorts() {
+        return m_requiredPorts;
+    }
+
+    @Override
+    public PortType[] getConfiguredPorts() {
+        return m_configuredPorts.toArray(new PortType[0]);
+    }
+
+    @Override
+    public boolean canAddPort() {
+        return false;
+    }
+
+    @Override
+    public boolean hasConfiguredPorts() {
+        return !m_configuredPorts.isEmpty();
+    }
+
+    @Override
+    public void addPort(final PortType pType) {
+        m_configuredPorts.add(pType);
+    }
+
+    @Override
+    public PortType removeLastPort() {
+        return m_configuredPorts.remove(m_configuredPorts.size() - 1);
     }
 
 }

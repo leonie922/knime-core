@@ -75,6 +75,6 @@ public interface IExtendablePort extends IPortGroupConfiguration {
 
     public void addPort(final PortType pType);
 
-    public boolean removeLastPort();
+    public PortType removeLastPort();
 
 }

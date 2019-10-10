@@ -59,6 +59,6 @@ public interface IExchangeablePort extends IPortGroupConfiguration {
 
     PortType getSelectedPortType();
 
-    PortType[] getAvailablePortTypes();
+    PortType[] getSupportedPortTypes();
 
 }
