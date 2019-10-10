@@ -50,6 +50,7 @@ package org.knime.core.data.probability;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.event.MouseEvent;
@@ -78,9 +79,7 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
 
     private static final String DESCRIPTION_PROB_DISTR = "Probability Distribution2";
 
-//    BarIcon m_icon;
-
-    private List<ClassProbabilityBar> m_bars;
+    private final List<ClassProbabilityBar> m_bars = new ArrayList<>();
 
     private static class ClassProbability {
         private double m_probability;
@@ -106,10 +105,33 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
     }
 
     private static class ClassProbabilityBar extends Rectangle2D.Double {
-        private ClassProbability m_classProbability;
 
-        public ClassProbabilityBar(final ClassProbability classProbability) {
+        private static final long serialVersionUID = 1L;
+
+        private static final int TOTAL_HEIGHT = 50;
+
+        private static final int MARGIN_TOP = 5;
+
+        private static final int BAR_WIDTH = 50;
+
+        private static final int MARGIN_LEFT = 5;
+
+        private final ClassProbability m_classProbability;
+
+        public ClassProbabilityBar(final ClassProbability classProbability, final int offset, final double barWidth,
+            final double barHeight) {
+            super(barWidth * offset + MARGIN_LEFT,
+                barHeight + MARGIN_TOP - calculateHeight(classProbability, barHeight), barWidth,
+                calculateHeight(classProbability, barHeight));
             m_classProbability = classProbability;
+        }
+
+        /**
+         * @param classProbability
+         * @return
+         */
+        private static double calculateHeight(final ClassProbability classProbability, final double barHeight) {
+            return (int)(classProbability.getProbability() * barHeight);
         }
 
         ClassProbability getClassProbability() {
@@ -119,9 +141,7 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
 
     ProbabilityDistributionValueRenderer2(final DataColumnSpec spec) {
         super(spec);
-        m_bars = new ArrayList<>();
-//        m_icon = new BarIcon();
-    }
+       }
 
     @Override
     public String getDescription() {
@@ -148,41 +168,28 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
     protected void paintComponent(final Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D)g.create();
-        int offset = 0;
         for (ClassProbabilityBar bar : m_bars) {
-            int height = (int)(bar.getClassProbability().getProbability() * 100 / 2);
-            int startVertical = 100 / 3 + 100 / 2 - height;
-            int startHorizontal = (100 * offset);
-            offset++;
             g2d.setPaint(Color.ORANGE);
-            g2d.setStroke(new BasicStroke(10));
-            g2d.fill(new Rectangle2D.Double(startHorizontal, startVertical, 100, height));
-            g2d.setPaint(Color.black);
-            g2d.draw3DRect(startHorizontal, startVertical, 100, height, true);
+            g2d.setStroke(new BasicStroke(1));
+            g2d.fill(bar);
+            g2d.setPaint(Color.BLACK);
+            g2d.draw(bar);
         }
     }
 
     @Override
     protected void setValue(final Object value) {
+        m_bars.clear();
         if (value instanceof ProbabilityDistributionValue) {
             List<String> probClasses = getColSpec().getElementNames();
             ProbabilityDistributionValue probDistrValue = (ProbabilityDistributionValue)value;
-//            String[] values = new String[probDistrValue.size()];
-//            double[] valuesBars = new double[probDistrValue.size()];
+            super.setPreferredSize(new Dimension(probDistrValue.size() * 50 + 10, 60));
             for (int i = 0; i < probDistrValue.size(); i++) {
                 m_bars.add(
-                    new ClassProbabilityBar(new ClassProbability(probDistrValue.getProbability(i), probClasses.get(i))));
+                    new ClassProbabilityBar(new ClassProbability(probDistrValue.getProbability(i), probClasses.get(i)),
+                        i, (Math.abs(super.getBounds().getX())-10) / probDistrValue.size(),
+                        Math.abs(super.getBounds().getY())-10));
             }
-//            Icon icon = getIcon();
-//            if (icon == null) {
-//                super.setIcon(m_icon);
-//                icon = m_icon;
-//            }
-//            ((BarIcon)icon).setText(probClasses);
-//            ((BarIcon)icon).setBars(valuesBars);
-//            ((BarIcon)icon).setNumberOfColumns(probDistrValue.size());
-//            ((BarIcon)icon).setValue(10);
-
         } else {
             super.setValue(value);
         }
@@ -201,73 +208,4 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
             return new ProbabilityDistributionValueRenderer2(colSpec);
         }
     }
-//
-//    private class BarIcon implements Icon {
-//
-//        private int m_value = 0;
-//
-//        private double[] m_bars;
-//
-//        private List<String> m_labelText;
-//
-//        private int m_numberOfColumns;
-//
-//        public void setBars(final double[] bars) {
-//            m_bars = bars;
-//        }
-//
-//        public void setText(final List<String> labelText) {
-//            m_labelText = labelText;
-//        }
-//
-//        public void setNumberOfColumns(final int numberOfColumns) {
-//            m_numberOfColumns = numberOfColumns;
-//        }
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        public int getIconHeight() {
-//            return 80;
-//        }
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        public int getIconWidth() {
-//            return 100;
-//        }
-//
-//        /**
-//         * Sets the current vale.
-//         *
-//         * @param d double value.
-//         */
-//        public void setValue(final int d) {
-//            m_value = d;
-//        }
-//
-//        /**
-//         * {@inheritDoc}
-//         */
-//        @Override
-//        public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
-//            int width = m_value * m_numberOfColumns;
-//            for (int i = 0; i < m_bars.length; i++) {
-//                int height = (int)(m_bars[i] * 100 / 2);
-//                int startVertical = getIconHeight() / 3 + getIconHeight() / 2 - height;
-//                int startHorizontal = x + (width * i);
-//                final Graphics2D g2d = (Graphics2D)g;
-//                g2d.setPaint(Color.ORANGE);
-//                g2d.setStroke(new BasicStroke(10));
-//                g2d.fill(new Rectangle2D.Double(startHorizontal, startVertical, width, height));
-//                g2d.setPaint(Color.black);
-//                g2d.draw3DRect(startHorizontal, startVertical, width, height, true);
-//                g2d.drawString(m_labelText.get(i), startHorizontal, startVertical - 1);
-//            }
-//
-//        }
-//    }
 }
