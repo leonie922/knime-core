@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,49 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.ports.impl;
 
-import java.net.URL;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+
+import org.knime.core.node.context.ports.IPortGroupConfiguration;
+import org.knime.core.node.context.ports.IPortsConfigurationRO;
+import org.knime.core.node.port.PortType;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class NodeCreationContext {
+public class PortsConfigurationRO implements IPortsConfigurationRO {
 
-    /**
-     * @since 4.1
-     */
-    protected URL m_url;
+    protected final Map<String, IPortGroupConfiguration> m_portGroups;
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
+    protected PortsConfigurationRO(final Map<String, IPortGroupConfiguration> portGroups) {
+        m_portGroups = portGroups;
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
+    @Override
+    public PortType[] getInputPorts() {
+        return getPorts(IPortGroupConfiguration::definesInputPorts);
     }
+
+    @Override
+    public PortType[] getOutputPorts() {
+        return getPorts(IPortGroupConfiguration::definesOutputPorts);
+    }
+
+    private PortType[] getPorts(final Predicate<IPortGroupConfiguration> pred) {
+        return m_portGroups.values().stream()//
+            .filter(pred)//
+            .map(IPortGroupConfiguration::getPorts)//
+            .flatMap(Stream::of)//
+            .toArray(PortType[]::new);
+    }
+
 }

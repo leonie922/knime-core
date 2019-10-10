@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,57 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.url;
 
 import java.net.URL;
 
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeCreationContext;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
+
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-public class NodeCreationContext {
+public final class URLConfiguration extends NodeCreationContext implements IURLConfiguration {
 
     /**
-     * @since 4.1
+     * Constructor.
      */
-    protected URL m_url;
+    public URLConfiguration() {
+        this(null);
+    }
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
+    private URLConfiguration(final URL url) {
+        super(url);
+    }
+
+    @Override
+    public void setURL(final URL url) {
         m_url = url;
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
+    @Override
+    public URLConfiguration copy() {
+        // url's are immutable
+        return new URLConfiguration(m_url);
     }
+
+    @Override
+    public void saveSettingsTo(final NodeSettingsWO settings) {
+        // Nothing to do
+    }
+
+    @Override
+    public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
+        // Nothing to do
+    }
+
 }

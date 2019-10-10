@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,77 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.ports.impl;
 
-import java.net.URL;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
+
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.context.ports.IExchangeablePort;
+import org.knime.core.node.context.ports.IExtendablePort;
+import org.knime.core.node.context.ports.IPortGroupConfiguration;
+import org.knime.core.node.context.ports.IPortsConfiguration;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class NodeCreationContext {
+public class PortsConfiguration extends PortsConfigurationRO implements IPortsConfiguration {
 
     /**
-     * @since 4.1
+     * @param portGroups
      */
-    protected URL m_url;
-
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
+    protected PortsConfiguration(final Map<String, IPortGroupConfiguration> portGroups) {
+        super(portGroups);
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
+    @Override
+    public IPortsConfiguration copy() {
+        return null;
     }
+
+    @Override
+    public void saveSettingsTo(final NodeSettingsWO settings) {
+        m_portGroups.forEach((s, c) -> c.saveSettingsTo(settings.addNodeSettings(s)));
+    }
+
+    @Override
+    public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
+        for (Entry<String, IPortGroupConfiguration> entry : m_portGroups.entrySet()) {
+            entry.getValue().loadSettingsFrom(settings.getNodeSettings(entry.getKey()));
+        }
+    }
+
+    @Override
+    public Map<String, IExchangeablePort> getExchangeablePorts() {
+        return getPorts(IExchangeablePort.class);
+    }
+
+    @Override
+    public Map<String, IExtendablePort> getExtendablePorts() {
+        return getPorts(IExtendablePort.class);
+    }
+
+    private <P extends IPortGroupConfiguration> Map<String, P> getPorts(final Class<P> cls) {
+        return m_portGroups.entrySet().stream()//
+            .filter(e -> cls.isInstance(e.getValue()))//
+            .collect(Collectors.toMap(//
+                e -> e.getKey(), //
+                e -> (cls.cast(e.getValue())), //
+                (u, v) -> {
+                    throw new IllegalStateException(String.format("Duplicate key %s", u));
+                }, //
+                LinkedHashMap::new)//
+        );
+    }
+
 }

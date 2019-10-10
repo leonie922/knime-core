@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,44 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.ports;
 
-import java.net.URL;
+import org.knime.core.node.context.IDeepCopy;
+import org.knime.core.node.context.INodeSettingsSerializable;
+import org.knime.core.node.port.PortType;
 
 /**
- * @author ohl, University of Konstanz
+ * Marker interface for all classes that allow modifying a node's ports.
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-public class NodeCreationContext {
+public interface IPortGroupConfiguration extends IDeepCopy<IPortGroupConfiguration>, INodeSettingsSerializable {
 
     /**
-     * @since 4.1
+     * Returns the configured port types. Cannot return null.
+     *
+     * @return the configured port types
      */
-    protected URL m_url;
+    public PortType[] getPorts();
 
     /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
-    }
-
-    /**
-     * @return the url
+     * Flag indicating whether this port group configuration defines input ports, or not.
+     *
+     * @return {@code true} if this port group represents configurable input ports, {@code false} otherwise
      */
-    public URL getUrl() {
-        return m_url;
-    }
+    public boolean definesInputPorts();
+
+    /**
+     * Flag indicating whether this port group configuration defines output ports, or not.
+     *
+     * @return {@code true} if this port group represents configurable output ports, {@code false} otherwise
+     */
+    public boolean definesOutputPorts();
+
 }

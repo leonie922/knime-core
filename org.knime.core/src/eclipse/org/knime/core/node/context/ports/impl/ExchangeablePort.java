@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,84 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.ports.impl;
 
-import java.net.URL;
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.context.ports.IExchangeablePort;
+import org.knime.core.node.context.ports.IPortGroupConfiguration;
+import org.knime.core.node.port.PortType;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class NodeCreationContext {
+public class ExchangeablePort implements IExchangeablePort {
 
-    /**
-     * @since 4.1
-     */
-    protected URL m_url;
+    private PortType m_curType;
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
+    private final PortType[] m_supportedTypes;
+
+    private final boolean m_definesInputPorts;
+
+    private final boolean m_definesOutputPorts;
+
+    private ExchangeablePort(final PortType defaultType, final PortType[] supportedTypes,
+        final boolean definesInputPorts, final boolean definesOutputPorts) {
+        m_curType = defaultType;
+        m_supportedTypes = supportedTypes;
+        m_definesInputPorts = definesInputPorts;
+        m_definesOutputPorts = definesOutputPorts;
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
+    @Override
+    public PortType[] getPorts() {
+        return new PortType[]{m_curType};
     }
+
+    @Override
+    public boolean definesInputPorts() {
+        return definesInputPorts();
+    }
+
+    @Override
+    public boolean definesOutputPorts() {
+        return m_definesOutputPorts;
+    }
+
+    @Override
+    public IPortGroupConfiguration copy() {
+        return new ExchangeablePort(m_curType, m_supportedTypes, m_definesInputPorts, m_definesOutputPorts);
+    }
+
+    @Override
+    public void saveSettingsTo(final NodeSettingsWO settings) {
+
+
+    }
+
+    @Override
+    public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public PortType getSelectedPortType() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public PortType[] getAvailablePortTypes() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 }

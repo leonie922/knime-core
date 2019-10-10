@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,40 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.ports;
 
-import java.net.URL;
+import org.apache.commons.lang3.ArrayUtils;
+import org.knime.core.node.port.PortType;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-public class NodeCreationContext {
+public interface IExtendablePort extends IPortGroupConfiguration {
 
-    /**
-     * @since 4.1
-     */
-    protected URL m_url;
+    public boolean accepts(final PortType pType);
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
+    @Override
+    default public PortType[] getPorts() {
+        return ArrayUtils.addAll(getRequiredPorts(), getConfiguredPorts());
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
-    }
+    public PortType[] getRequiredPorts();
+
+    public PortType[] getConfiguredPorts();
+
+    public boolean canAddPort();
+
+    public boolean hasConfiguredPorts();
+
+    public void addPort(final PortType pType);
+
+    public boolean removeLastPort();
+
 }

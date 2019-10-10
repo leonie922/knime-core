@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,25 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.url;
 
 import java.net.URL;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class NodeCreationContext {
+public interface IURLConfigurationRO {
 
     /**
-     * @since 4.1
+     * Returns the URL.
+     *
+     * @return the Url
      */
-    protected URL m_url;
-
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
-    }
-
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
-    }
+    public URL getUrl();
 }

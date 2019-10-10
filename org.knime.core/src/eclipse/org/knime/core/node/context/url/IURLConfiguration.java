@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,31 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context.url;
 
 import java.net.URL;
 
+import org.knime.core.node.context.IDeepCopy;
+import org.knime.core.node.context.INodeSettingsSerializable;
+
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
-public class NodeCreationContext {
+public interface IURLConfiguration
+    extends IURLConfigurationRO, IDeepCopy<IURLConfiguration>, INodeSettingsSerializable {
 
     /**
-     * @since 4.1
+     * Sets the given URL.
+     *
+     * @param url the URL
      */
-    protected URL m_url;
+    public void setURL(final URL url);
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
-    }
-
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
-    }
 }

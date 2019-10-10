@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,33 +41,55 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ------------------------------------------------------------------------
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node;
+package org.knime.core.node.context;
 
-import java.net.URL;
+import java.util.Optional;
+
+import org.knime.core.node.ConfigurableNodeFactory;
+import org.knime.core.node.context.ports.IPortsConfiguration;
+import org.knime.core.node.context.ports.IPortsConfigurationRO;
+import org.knime.core.node.context.url.IURLConfiguration;
+import org.knime.core.node.context.url.IURLConfigurationRO;
 
 /**
- * @author ohl, University of Konstanz
+ *
+ * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class NodeCreationContext {
+public class NodeCreationConfigurationRO {
 
-    /**
-     * @since 4.1
-     */
-    protected URL m_url;
+    protected final IURLConfiguration m_urlConfig;
 
-    /**
-         *
-         */
-    public NodeCreationContext(final URL url) {
-        m_url = url;
+    protected final IPortsConfiguration m_portsConfig;
+
+    protected NodeCreationConfigurationRO(final ConfigurableNodeFactory<?> factory) {
+        m_urlConfig = factory.getURLConfig().orElse(null);
+        m_portsConfig = factory.getPortsConfig().orElse(null);
     }
 
-    /**
-     * @return the url
-     */
-    public URL getUrl() {
-        return m_url;
+    protected NodeCreationConfigurationRO(final IURLConfiguration url, final IPortsConfiguration portsConfig) {
+        m_urlConfig = url;
+        m_portsConfig = portsConfig;
     }
+
+    public boolean isURLConfigurable() {
+        return m_urlConfig != null;
+    }
+
+    public boolean isPortsConfigurable() {
+        return m_portsConfig != null;
+    }
+
+    public Optional<IPortsConfigurationRO> getPortConfigRO() {
+        return Optional.ofNullable(m_portsConfig);
+    }
+
+    public Optional<IURLConfigurationRO> getURLConfigRO() {
+        return Optional.ofNullable(m_urlConfig);
+    }
+
 }
