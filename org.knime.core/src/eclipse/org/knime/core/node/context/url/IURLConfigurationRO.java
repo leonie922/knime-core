@@ -51,8 +51,10 @@ package org.knime.core.node.context.url;
 import java.net.URL;
 
 /**
+ * The url configuration interface.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @noimplement This interface is not intended to be implemented by clients.
  */
 public interface IURLConfigurationRO {
 

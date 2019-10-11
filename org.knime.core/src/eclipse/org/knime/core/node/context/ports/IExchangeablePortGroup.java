@@ -54,6 +54,8 @@ import org.knime.core.node.port.PortType;
  * Interface defining any port group where ports can be exchanged but not added/removed.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noimplement This interface is not intended to be implemented by clients.
  */
 public interface IExchangeablePortGroup extends IPortGroupConfiguration {
 

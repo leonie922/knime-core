@@ -57,7 +57,8 @@ import org.knime.core.node.context.INodeSettingsSerializable;
  * Interface defining a node's port configuration.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- *
+ * @since 4.1
+ * @noimplement This interface is not intended to be implemented by clients.
  */
 public interface IPortsConfiguration
     extends IPortsConfigurationRO, IDeepCopy<IPortsConfiguration>, INodeSettingsSerializable {

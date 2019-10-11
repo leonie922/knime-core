@@ -54,9 +54,11 @@ import org.knime.core.node.context.IDeepCopy;
 import org.knime.core.node.context.INodeSettingsSerializable;
 
 /**
+ * The url configuration interface.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.1
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noimplement This interface is not intended to be implemented by clients.
  */
 public interface IURLConfiguration
     extends IURLConfigurationRO, IDeepCopy<IURLConfiguration>, INodeSettingsSerializable {

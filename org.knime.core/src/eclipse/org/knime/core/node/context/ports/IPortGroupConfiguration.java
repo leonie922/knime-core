@@ -56,6 +56,8 @@ import org.knime.core.node.port.PortType;
  * Interface for all classes that allow modifying a node's ports.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noimplement This interface is not intended to be implemented by clients.
  */
 public interface IPortGroupConfiguration extends IDeepCopy<IPortGroupConfiguration>, INodeSettingsSerializable {
 

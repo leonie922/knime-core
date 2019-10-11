@@ -62,6 +62,7 @@ import org.knime.core.node.context.url.IURLConfigurationRO;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
+ * @noextend This class is not intended to be subclassed by clients.
  */
 public class NodeCreationConfigurationRO {
 
