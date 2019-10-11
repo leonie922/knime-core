@@ -47,6 +47,14 @@
  */
 package org.knime.core.node;
 
+import java.util.Optional;
+
+import org.knime.core.node.context.NodeCreationConfigurationRO;
+import org.knime.core.node.context.ports.IPortsConfiguration;
+import org.knime.core.node.context.url.IURLConfiguration;
+import org.knime.core.node.context.url.IURLConfigurationRO;
+import org.knime.core.node.context.url.impl.URLConfiguration;
+
 /**
  * This extension of {@link NodeFactory} is used in order to create a new node
  * in a certain context. Implementors who wish that their nodes can be used in a
@@ -58,13 +66,31 @@ package org.knime.core.node;
  * @author Thorsten Meinl, University of Konstanz
  */
 public abstract class ContextAwareNodeFactory<T extends NodeModel> extends
-        NodeFactory<T> {
+        ConfigurableNodeFactory<T> {
+
+    @Override
+    public Optional<IURLConfiguration> getURLConfig() {
+        return Optional.of(new URLConfiguration());
+    }
+
+    @Override
+    public Optional<IPortsConfiguration> getPortsConfig() {
+        return Optional.empty();
+    }
+
+    @Override
+    protected T createNodeModel(final NodeCreationConfigurationRO creationConfig) {
+        // cannot be null since we implemented #getURLConfig
+        final IURLConfigurationRO urlConfig = creationConfig.getURLConfigRO().get();
+        return urlConfig.getUrl() == null ? createNodeModel()
+            : createNodeModel(new NodeCreationContext(urlConfig.getUrl()));
+    }
+
     /**
      * Creates a new node model.
      *
      * @param context the context in which the node should be created
      * @return a node model
      */
-    @Override
-    public abstract T createNodeModel(final NodeCreationContext context);
+    protected abstract T createNodeModel(final NodeCreationContext context);
 }

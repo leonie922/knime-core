@@ -62,6 +62,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.xmlbeans.XmlException;
 import org.knime.core.node.config.ConfigRO;
 import org.knime.core.node.config.ConfigWO;
+import org.knime.core.node.context.NodeCreationConfigurationRO;
 import org.knime.core.node.missing.MissingNodeFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -450,16 +451,17 @@ public abstract class NodeFactory<T extends NodeModel> {
     public abstract T createNodeModel();
 
     /**
-     * Creates a new node model using a specific context. This method must be overriden by nodes that make use
-     * of contexts.
+     * Creates a new node model using a specific creation configuration. This method must be overriden by nodes that
+     * make use of creation configurations.
      *
-     * @param context the node context
+     * @param creationConfig the node creation configuration
      * @return a new {@link NodeModel}
+     * @since 4.1
      */
-    protected T createNodeModel(final NodeCreationContext context) {
+    protected T createNodeModel(final NodeCreationConfigurationRO creationConfig) {
         // normally correct implementations overwrite this
         m_logger.coding("If you register a node to be created in a certain"
-                + " context, you should extend ContextAwareNodeFactory");
+            + " context, you should extend ConfigurableNodeFactory");
         return createNodeModel();
     }
 
@@ -475,12 +477,12 @@ public abstract class NodeFactory<T extends NodeModel> {
      *
      * @return the model as from createNodeModel()
      */
-    final T callCreateNodeModel(final NodeCreationContext context) {
+    final T callCreateNodeModel(final NodeCreationConfigurationRO creationConfig) {
         T result;
-        if (context == null) {
+        if (creationConfig == null) {
             result = createNodeModel();
         } else {
-            result = createNodeModel(context);
+            result = createNodeModel(creationConfig);
         }
         if (KNIMEConstants.ASSERTIONS_ENABLED) {
             checkConsistency(result);

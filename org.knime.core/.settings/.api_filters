@@ -94,6 +94,14 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/eclipse/org/knime/core/node/ContextAwareNodeFactory.java" type="org.knime.core.node.ContextAwareNodeFactory">
+        <filter id="421572723">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.ContextAwareNodeFactory"/>
+                <message_argument value="createNodeModel(NodeCreationContext)"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/eclipse/org/knime/core/node/DynamicNodeFactory.java" type="org.knime.core.node.DynamicNodeFactory">
         <filter id="1141899266">
             <message_arguments>
@@ -108,6 +116,22 @@
             <message_arguments>
                 <message_argument value="KnowsRowCountTable"/>
                 <message_argument value="ExtensionTable"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/Node.java" type="org.knime.core.node.Node">
+        <filter id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.Node"/>
+                <message_argument value="Node(NodeFactory&lt;NodeModel&gt;, NodeCreationContext)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/NodeFactory.java" type="org.knime.core.node.NodeFactory">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.NodeFactory"/>
+                <message_argument value="createNodeModel(NodeCreationContext)"/>
             </message_arguments>
         </filter>
     </resource>
@@ -140,6 +164,14 @@
             <message_arguments>
                 <message_argument value="SubNodeContainerPersistor"/>
                 <message_argument value="CopySubNodeContainerPersistor"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/workflow/WorkflowManager.java" type="org.knime.core.node.workflow.WorkflowManager">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.WorkflowManager"/>
+                <message_argument value="addNodeAndApplyContext(NodeFactory&lt;?&gt;, NodeCreationContext)"/>
             </message_arguments>
         </filter>
     </resource>
