@@ -54,15 +54,25 @@ import org.knime.core.node.context.IDeepCopy;
 import org.knime.core.node.context.INodeSettingsSerializable;
 
 /**
+ * Interface defining a node's port configuration.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.1
  */
 public interface IPortsConfiguration
     extends IPortsConfigurationRO, IDeepCopy<IPortsConfiguration>, INodeSettingsSerializable {
 
-    public Map<String, IExchangeablePort> getExchangeablePorts();
+    /**
+     * Returns a map of all exchangeable ports.
+     *
+     * @return list of all exchangeable ports
+     */
+    public Map<String, IExchangeablePortGroup> getExchangeablePorts();
 
-    public Map<String, IExtendablePort> getExtendablePorts();
+    /**
+     * Returns a map of all extendable ports.
+     *
+     * @return list of all extendable ports
+     */
+    public Map<String, IExtendablePortGroup> getExtendablePorts();
 
 }

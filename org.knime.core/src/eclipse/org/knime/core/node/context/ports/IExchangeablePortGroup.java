@@ -42,19 +42,49 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- * 
+ *
  * History
- *   Oct 11, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context.ports.both;
+package org.knime.core.node.context.ports;
 
-import org.knime.core.node.context.ports.input.PortInputConfiguration;
-import org.knime.core.node.context.ports.output.PortOutputConfiguration;
+import org.knime.core.node.port.PortType;
 
 /**
- * 
+ * Interface defining any port group where ports can be exchanged but not added/removed.
+ *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public interface PortInputOutputConfiguration extends PortInputConfiguration, PortOutputConfiguration {
+public interface IExchangeablePortGroup extends IPortGroupConfiguration {
+
+    /**
+     * Returns the selected port type.
+     *
+     * @return the selected port type
+     */
+    PortType getSelectedPortType();
+
+    /**
+     * Returns all supported port types.
+     *
+     * @return all supported port types
+     */
+    PortType[] getSupportedPortTypes();
+
+    @Override
+    default public PortType[] getInputPorts() {
+        if (definesInputPorts()) {
+            return new PortType[]{getSelectedPortType()};
+        }
+        throw UNSUPPORTED_INPUT_OPERATION;
+    }
+
+    @Override
+    default public PortType[] getOutputPorts() {
+        if (definesOutputPorts()) {
+            return new PortType[]{getSelectedPortType()};
+        }
+        throw UNSUPPORTED_OUTPUT_OPERATION;
+    }
 
 }

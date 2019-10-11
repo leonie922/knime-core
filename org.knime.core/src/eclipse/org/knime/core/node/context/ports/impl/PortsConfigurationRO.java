@@ -49,6 +49,7 @@
 package org.knime.core.node.context.ports.impl;
 
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -62,26 +63,33 @@ import org.knime.core.node.port.PortType;
  */
 public class PortsConfigurationRO implements IPortsConfigurationRO {
 
+    /** Map storing the port groups. */
     protected final Map<String, IPortGroupConfiguration> m_portGroups;
 
+    /**
+     * Constructor.
+     *
+     * @param portGroups the port groups map
+     */
     protected PortsConfigurationRO(final Map<String, IPortGroupConfiguration> portGroups) {
         m_portGroups = portGroups;
     }
 
     @Override
     public PortType[] getInputPorts() {
-        return getPorts(IPortGroupConfiguration::definesInputPorts);
+        return getPorts(IPortGroupConfiguration::definesInputPorts, IPortGroupConfiguration::getInputPorts);
     }
 
     @Override
     public PortType[] getOutputPorts() {
-        return getPorts(IPortGroupConfiguration::definesOutputPorts);
+        return getPorts(IPortGroupConfiguration::definesOutputPorts, IPortGroupConfiguration::getOutputPorts);
     }
 
-    private PortType[] getPorts(final Predicate<IPortGroupConfiguration> pred) {
+    private PortType[] getPorts(final Predicate<IPortGroupConfiguration> pred,
+        final Function<IPortGroupConfiguration, PortType[]> f) {
         return m_portGroups.values().stream()//
             .filter(pred)//
-            .map(IPortGroupConfiguration::getPorts)//
+            .map(f)//
             .flatMap(Stream::of)//
             .toArray(PortType[]::new);
     }

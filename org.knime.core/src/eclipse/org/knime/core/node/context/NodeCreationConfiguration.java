@@ -52,12 +52,14 @@ import java.util.Optional;
 
 import org.knime.core.node.ConfigurableNodeFactory;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeModel;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.context.ports.IPortsConfiguration;
 import org.knime.core.node.context.url.IURLConfiguration;
 
 /**
+ * Class storing any additional information required for the appropriate initialization of a {@link NodeModel}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
@@ -68,7 +70,12 @@ public final class NodeCreationConfiguration extends NodeCreationConfigurationRO
     /** Node creation config key. */
     private static final String NODE_CREATION_CONFIG_KEY = "node_creation_config";
 
-    public NodeCreationConfiguration(final ConfigurableNodeFactory<?> factory) {
+    /**
+     * Constructor.
+     *
+     * @param factory the node factory
+     */
+    public NodeCreationConfiguration(final ConfigurableNodeFactory<NodeModel> factory) {
         super(factory);
     }
 
@@ -76,10 +83,20 @@ public final class NodeCreationConfiguration extends NodeCreationConfigurationRO
         super(url, portsConfig);
     }
 
+    /**
+     * Returns the ports config.
+     *
+     * @return the ports config
+     */
     public Optional<IPortsConfiguration> getPortsConfig() {
         return Optional.ofNullable(m_portsConfig);
     }
 
+    /**
+     * Returns the url config.
+     *
+     * @return the url config
+     */
     public Optional<IURLConfiguration> getURLConfig() {
         return Optional.ofNullable(m_urlConfig);
     }

@@ -46,7 +46,7 @@
  * History
  *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context.url;
+package org.knime.core.node.context.url.impl;
 
 import java.net.URL;
 
@@ -54,6 +54,7 @@ import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeCreationContext;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.context.url.IURLConfiguration;
 
 /**
  *

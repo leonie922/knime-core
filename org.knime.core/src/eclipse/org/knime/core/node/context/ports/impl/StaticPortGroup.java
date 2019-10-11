@@ -46,16 +46,71 @@
  * History
  *   Oct 11, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context.ports.output;
+package org.knime.core.node.context.ports.impl;
 
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettingsRO;
+import org.knime.core.node.NodeSettingsWO;
+import org.knime.core.node.context.ports.IPortGroupConfiguration;
 import org.knime.core.node.port.PortType;
 
 /**
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public interface PortOutputConfiguration {
+final class StaticPortGroup implements IPortGroupConfiguration {
 
-    PortType[] getOutputPorts();
+    private final PortType[] m_pTypes;
+
+    private final boolean m_definesInputPorts;
+
+    private final boolean m_definesOutputPorts;
+
+    StaticPortGroup(final PortType[] pTypes, final boolean definesInputPorts, final boolean definesOutputPorts) {
+        m_pTypes = pTypes;
+        m_definesInputPorts = definesInputPorts;
+        m_definesOutputPorts = definesOutputPorts;
+    }
+
+    @Override
+    public StaticPortGroup copy() {
+        return new StaticPortGroup(m_pTypes.clone(), m_definesInputPorts, m_definesOutputPorts);
+    }
+
+    @Override
+    public void saveSettingsTo(final NodeSettingsWO settings) {
+        // nothing to do
+    }
+
+    @Override
+    public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
+        // nothing to do
+    }
+
+    @Override
+    public boolean definesInputPorts() {
+        return m_definesInputPorts;
+    }
+
+    @Override
+    public boolean definesOutputPorts() {
+        return m_definesOutputPorts;
+    }
+
+    @Override
+    public PortType[] getInputPorts() {
+        if (definesInputPorts()) {
+            return m_pTypes;
+        }
+        throw UNSUPPORTED_INPUT_OPERATION;
+    }
+
+    @Override
+    public PortType[] getOutputPorts() {
+        if (definesOutputPorts()) {
+            return m_pTypes;
+        }
+        throw UNSUPPORTED_OUTPUT_OPERATION;
+    }
 
 }

@@ -48,43 +48,55 @@
  */
 package org.knime.core.node.context.ports.impl;
 
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.stream.IntStream;
+
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExchangeablePort;
-import org.knime.core.node.context.ports.IPortGroupConfiguration;
+import org.knime.core.node.context.ports.IExtendablePortGroup;
 import org.knime.core.node.port.PortType;
 
 /**
+ * Implementation of an extendable port group.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class ExchangeablePort implements IExchangeablePort {
+final class ExtendablePortGroup implements IExtendablePortGroup {
 
-    private PortType m_curType;
+    private final PortType[] m_requiredTypes;
 
     private final PortType[] m_supportedTypes;
+
+    private final List<PortType> m_configuredTypes;
 
     private final boolean m_definesInputPorts;
 
     private final boolean m_definesOutputPorts;
 
-    private ExchangeablePort(final PortType defaultType, final PortType[] supportedTypes,
+    ExtendablePortGroup(final PortType[] requiredTypes, final PortType[] supportedTypes,
         final boolean definesInputPorts, final boolean definesOutputPorts) {
-        m_curType = defaultType;
+        m_requiredTypes = requiredTypes;
         m_supportedTypes = supportedTypes;
+        m_configuredTypes = new ArrayList<>();
+        m_definesInputPorts = definesInputPorts;
+        m_definesOutputPorts = definesOutputPorts;
+    }
+
+    private ExtendablePortGroup(final PortType[] requiredPorts, final PortType[] supportedTypes,
+        final List<PortType> configuredPorts, final boolean definesInputPorts, final boolean definesOutputPorts) {
+        m_requiredTypes = requiredPorts;
+        m_supportedTypes = supportedTypes;
+        m_configuredTypes = configuredPorts;
         m_definesInputPorts = definesInputPorts;
         m_definesOutputPorts = definesOutputPorts;
     }
 
     @Override
-    public PortType[] getPorts() {
-        return new PortType[]{m_curType};
-    }
-
-    @Override
     public boolean definesInputPorts() {
-        return definesInputPorts();
+        return m_definesInputPorts;
     }
 
     @Override
@@ -93,25 +105,61 @@ public class ExchangeablePort implements IExchangeablePort {
     }
 
     @Override
-    public IPortGroupConfiguration copy() {
-        return new ExchangeablePort(m_curType, m_supportedTypes, m_definesInputPorts, m_definesOutputPorts);
+    public ExtendablePortGroup copy() {
+        return new ExtendablePortGroup(m_requiredTypes.clone(), m_supportedTypes.clone(),
+            new ArrayList<PortType>(m_configuredTypes), m_definesInputPorts, m_definesOutputPorts);
     }
 
     @Override
     public void saveSettingsTo(final NodeSettingsWO settings) {
-        m_curType.save(settings);
+        IntStream.range(0, m_configuredTypes.size())//
+            .forEach(idx -> m_configuredTypes.get(idx).save(settings.addNodeSettings("port_" + idx)));
     }
 
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        m_curType = PortType.load(settings);
+        m_configuredTypes.clear();
+        @SuppressWarnings("unchecked")
+        Enumeration<NodeSettingsRO> children = settings.children();
+        while (children.hasMoreElements()) {
+            m_configuredTypes.add(PortType.load(children.nextElement()));
+        }
     }
 
     @Override
-    public PortType getSelectedPortType() {
-        return m_curType;
+    public PortType[] getRequiredPorts() {
+        return m_requiredTypes;
     }
 
+    @Override
+    public PortType[] getConfiguredPorts() {
+        return m_configuredTypes.toArray(new PortType[0]);
+    }
+
+    @Override
+    public boolean canAddPort() {
+        // TODO: Is there a use-case where a node can only handle a certain number of additional inputs?
+        return true;
+    }
+
+    @Override
+    public boolean hasConfiguredPorts() {
+        return !m_configuredTypes.isEmpty();
+    }
+
+    @Override
+    public void addPort(final PortType pType) {
+        m_configuredTypes.add(pType);
+    }
+
+    @Override
+    public PortType removeLastPort() {
+        return m_configuredTypes.remove(m_configuredTypes.size() - 1);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public PortType[] getSupportedPortTypes() {
         return m_supportedTypes;

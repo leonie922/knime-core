@@ -53,19 +53,37 @@ import org.knime.core.node.context.INodeSettingsSerializable;
 import org.knime.core.node.port.PortType;
 
 /**
- * Marker interface for all classes that allow modifying a node's ports.
+ * Interface for all classes that allow modifying a node's ports.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.1
  */
 public interface IPortGroupConfiguration extends IDeepCopy<IPortGroupConfiguration>, INodeSettingsSerializable {
 
+    /** The unsupported input operation exception. */
+    public static final UnsupportedOperationException UNSUPPORTED_INPUT_OPERATION =
+        new UnsupportedOperationException("This port group does not specify input ports.");
+
+    /** The unsupported output operation exception. */
+    public static final UnsupportedOperationException UNSUPPORTED_OUTPUT_OPERATION =
+        new UnsupportedOperationException("This port group does not specify output ports.");
+
     /**
-     * Returns the configured port types. Cannot return null.
+     * Returns the configured input port types. Cannot return null.
      *
-     * @return the configured port types
+     * @return the configured input port types
+     * @throws UnsupportedOperationException If this configuration does not {@link #definesInputPorts() define input
+     *             ports}
      */
-    public PortType[] getPorts();
+    public PortType[] getInputPorts();
+
+    /**
+     * Returns the configured input port types. Cannot return null.
+     *
+     * @return the configured output port types
+     * @throws UnsupportedOperationException If this configuration does not {@link #definesOutputPorts() define output
+     *             ports}
+     */
+    public PortType[] getOutputPorts();
 
     /**
      * Flag indicating whether this port group configuration defines input ports, or not.

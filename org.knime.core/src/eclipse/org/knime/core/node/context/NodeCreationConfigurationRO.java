@@ -51,43 +51,60 @@ package org.knime.core.node.context;
 import java.util.Optional;
 
 import org.knime.core.node.ConfigurableNodeFactory;
+import org.knime.core.node.NodeModel;
 import org.knime.core.node.context.ports.IPortsConfiguration;
 import org.knime.core.node.context.ports.IPortsConfigurationRO;
 import org.knime.core.node.context.url.IURLConfiguration;
 import org.knime.core.node.context.url.IURLConfigurationRO;
 
 /**
+ * Class storing any additional information required for the appropriate initialization of a {@link NodeModel}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
 public class NodeCreationConfigurationRO {
 
+    /** the url config. */
     protected final IURLConfiguration m_urlConfig;
 
+    /** the ports config. */
     protected final IPortsConfiguration m_portsConfig;
 
-    protected NodeCreationConfigurationRO(final ConfigurableNodeFactory<?> factory) {
+    /**
+     * Constructor.
+     *
+     * @param factory the node factory
+     */
+    protected NodeCreationConfigurationRO(final ConfigurableNodeFactory<NodeModel> factory) {
         m_urlConfig = factory.getURLConfig().orElse(null);
         m_portsConfig = factory.getPortsConfig().orElse(null);
     }
 
+    /**
+     * Constructor.
+     *
+     * @param url the url config
+     * @param portsConfig the ports config
+     */
     protected NodeCreationConfigurationRO(final IURLConfiguration url, final IPortsConfiguration portsConfig) {
         m_urlConfig = url;
         m_portsConfig = portsConfig;
     }
 
-    public boolean isURLConfigurable() {
-        return m_urlConfig != null;
-    }
-
-    public boolean isPortsConfigurable() {
-        return m_portsConfig != null;
-    }
-
+    /**
+     * Returns the port config.
+     *
+     * @return the port config.
+     */
     public Optional<IPortsConfigurationRO> getPortConfigRO() {
         return Optional.ofNullable(m_portsConfig);
     }
 
+    /**
+     * Returns the url config
+     *
+     * @return the url config
+     */
     public Optional<IURLConfigurationRO> getURLConfigRO() {
         return Optional.ofNullable(m_urlConfig);
     }

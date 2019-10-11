@@ -48,36 +48,31 @@
  */
 package org.knime.core.node.context.ports.impl;
 
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.stream.IntStream;
-
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExtendablePort;
-import org.knime.core.node.context.ports.IPortGroupConfiguration;
+import org.knime.core.node.context.ports.IExchangeablePortGroup;
 import org.knime.core.node.port.PortType;
 
 /**
+ * Implementation of an exchangeable port group.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class ExtendablePort implements IExtendablePort {
+final class ExchangeablePortGroup implements IExchangeablePortGroup {
 
-    private final PortType[] m_requiredPorts;
+    private PortType m_curType;
 
-    private final List<PortType> m_configuredPorts;
+    private final PortType[] m_supportedTypes;
 
     private final boolean m_definesInputPorts;
 
     private final boolean m_definesOutputPorts;
 
-    private ExtendablePort(final PortType[] requiredPorts, final List<PortType> configuredPorts,
-        final boolean definesInputPorts, final boolean definesOutputPorts) {
-        m_requiredPorts = requiredPorts;
-        m_configuredPorts = configuredPorts;
+    ExchangeablePortGroup(final PortType defaultType, final PortType[] supportedTypes, final boolean definesInputPorts,
+        final boolean definesOutputPorts) {
+        m_curType = defaultType;
+        m_supportedTypes = supportedTypes;
         m_definesInputPorts = definesInputPorts;
         m_definesOutputPorts = definesOutputPorts;
     }
@@ -93,61 +88,28 @@ public class ExtendablePort implements IExtendablePort {
     }
 
     @Override
-    public IPortGroupConfiguration copy() {
-        return new ExtendablePort(m_requiredPorts.clone(), new ArrayList<PortType>(m_configuredPorts),
-            m_definesInputPorts, m_definesOutputPorts);
+    public ExchangeablePortGroup copy() {
+        return new ExchangeablePortGroup(m_curType, m_supportedTypes, m_definesInputPorts, m_definesOutputPorts);
     }
 
     @Override
     public void saveSettingsTo(final NodeSettingsWO settings) {
-        IntStream.range(0, m_configuredPorts.size())//
-            .forEach(idx -> m_configuredPorts.get(idx).save(settings.addNodeSettings("port_" + idx)));
+        m_curType.save(settings);
     }
 
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        m_configuredPorts.clear();
-        @SuppressWarnings("unchecked")
-        Enumeration<NodeSettingsRO> children = settings.children();
-        while (children.hasMoreElements()) {
-            m_configuredPorts.add(PortType.load(children.nextElement()));
-        }
+        m_curType = PortType.load(settings);
     }
 
     @Override
-    public boolean accepts(final PortType pType) {
-        return m_configuredPorts.contains(pType);
+    public PortType getSelectedPortType() {
+        return m_curType;
     }
 
     @Override
-    public PortType[] getRequiredPorts() {
-        return m_requiredPorts;
-    }
-
-    @Override
-    public PortType[] getConfiguredPorts() {
-        return m_configuredPorts.toArray(new PortType[0]);
-    }
-
-    @Override
-    public boolean canAddPort() {
-        // TODO: Is there a use-case where a node can only handle a certain number of additional inputs?
-        return true;
-    }
-
-    @Override
-    public boolean hasConfiguredPorts() {
-        return !m_configuredPorts.isEmpty();
-    }
-
-    @Override
-    public void addPort(final PortType pType) {
-        m_configuredPorts.add(pType);
-    }
-
-    @Override
-    public PortType removeLastPort() {
-        return m_configuredPorts.remove(m_configuredPorts.size() - 1);
+    public PortType[] getSupportedPortTypes() {
+        return m_supportedTypes;
     }
 
 }

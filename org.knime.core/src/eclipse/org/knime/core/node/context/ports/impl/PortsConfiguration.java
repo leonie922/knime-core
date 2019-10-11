@@ -56,8 +56,8 @@ import java.util.stream.Collectors;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExchangeablePort;
-import org.knime.core.node.context.ports.IExtendablePort;
+import org.knime.core.node.context.ports.IExchangeablePortGroup;
+import org.knime.core.node.context.ports.IExtendablePortGroup;
 import org.knime.core.node.context.ports.IPortGroupConfiguration;
 import org.knime.core.node.context.ports.IPortsConfiguration;
 
@@ -92,13 +92,13 @@ public class PortsConfiguration extends PortsConfigurationRO implements IPortsCo
     }
 
     @Override
-    public Map<String, IExchangeablePort> getExchangeablePorts() {
-        return getPorts(IExchangeablePort.class);
+    public Map<String, IExchangeablePortGroup> getExchangeablePorts() {
+        return getPorts(IExchangeablePortGroup.class);
     }
 
     @Override
-    public Map<String, IExtendablePort> getExtendablePorts() {
-        return getPorts(IExtendablePort.class);
+    public Map<String, IExtendablePortGroup> getExtendablePorts() {
+        return getPorts(IExtendablePortGroup.class);
     }
 
     private <P extends IPortGroupConfiguration> Map<String, P> getPorts(final Class<P> cls) {

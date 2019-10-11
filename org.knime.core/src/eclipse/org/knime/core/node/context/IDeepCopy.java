@@ -49,13 +49,19 @@
 package org.knime.core.node.context;
 
 /**
+ * Any class implementing the interface can carry out a deep copy.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @param <T> the type of the copied object
  * @since 4.1
  */
 public interface IDeepCopy<T> {
 
-
+    /**
+     * Creates a deep copy of the object.
+     *
+     * @return the deep copy
+     */
     T copy();
 
 }

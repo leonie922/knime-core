@@ -49,18 +49,31 @@
 package org.knime.core.node.context;
 
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 
 /**
+ * Interface defining classes that can be saved to and loaded from {@link NodeSettings}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @since 4.1
  */
 public interface INodeSettingsSerializable {
 
+    /**
+     * Serializes the class specific settings to the given <code>NodeSettingsWO</code>.
+     *
+     * @param settings to serialize the class settings to
+     */
     public void saveSettingsTo(final NodeSettingsWO settings);
 
+    /**
+     * Loads the class specific settings from the given <code>NodeSettingsRO</code>.
+     *
+     * @param settings to load the class settings from
+     * @throws InvalidSettingsException If the validation of the settings failed.
+     */
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException;
 
 }

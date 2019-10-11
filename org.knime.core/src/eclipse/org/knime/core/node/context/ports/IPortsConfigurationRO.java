@@ -51,13 +51,24 @@ package org.knime.core.node.context.ports;
 import org.knime.core.node.port.PortType;
 
 /**
+ * Interface defining a node's port configuration.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
 public interface IPortsConfigurationRO {
 
+    /**
+     * Returns the configured input ports.
+     *
+     * @return the configured input ports
+     */
     PortType[] getInputPorts();
 
+    /**
+     * Returns the configured output ports.
+     *
+     * @return the configured output ports
+     */
     PortType[] getOutputPorts();
 
 }

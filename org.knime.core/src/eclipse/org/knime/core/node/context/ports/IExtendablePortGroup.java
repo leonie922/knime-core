@@ -44,19 +44,83 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 11, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
+ *   Oct 8, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context.ports.input;
+package org.knime.core.node.context.ports;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.knime.core.node.port.PortType;
 
 /**
+ * Interface defining any port group where ports can be added and removed.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public interface PortInputConfiguration {
+public interface IExtendablePortGroup extends IPortGroupConfiguration {
 
+    @Override
+    default public PortType[] getInputPorts() {
+        if (definesInputPorts()) {
+            return ArrayUtils.addAll(getRequiredPorts(), getConfiguredPorts());
+        }
+        throw UNSUPPORTED_INPUT_OPERATION;
+    }
 
-    PortType[] getInputPorts();
+    @Override
+    default public PortType[] getOutputPorts() {
+        if (definesOutputPorts()) {
+            return ArrayUtils.addAll(getRequiredPorts(), getConfiguredPorts());
+        }
+        throw UNSUPPORTED_OUTPUT_OPERATION;
+    }
+
+    /**
+     * Returns all supported port types.
+     *
+     * @return all supported port types
+     */
+    PortType[] getSupportedPortTypes();
+
+    /**
+     * Returns the required ports.
+     *
+     * @return the required ports
+     */
+    public PortType[] getRequiredPorts();
+
+    /**
+     * Returns the configured ports.
+     *
+     * @return the configured ports
+     */
+    public PortType[] getConfiguredPorts();
+
+    /**
+     * Defines wether or not additional ports can be added.
+     *
+     * @return {@code true} if more ports can be added, {@code false} otherwise
+     */
+    public boolean canAddPort();
+
+    /**
+     * Returns flag indicating whether or not additional ports have been configured.
+     *
+     * @return {@code true} if additional ports have been added, {@code false} otherwise
+     */
+    public boolean hasConfiguredPorts();
+
+    /**
+     * Adds an port to the configured ports.
+     *
+     * @param pType the port to be added
+     */
+    public void addPort(final PortType pType);
+
+    /**
+     * Removes the last port from the configured ports list.
+     *
+     * @return the last element from this list
+     */
+    public PortType removeLastPort();
 
 }
