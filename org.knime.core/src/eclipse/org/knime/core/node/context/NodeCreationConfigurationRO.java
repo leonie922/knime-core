@@ -61,6 +61,7 @@ import org.knime.core.node.context.url.IURLConfigurationRO;
  * Class storing any additional information required for the appropriate initialization of a {@link NodeModel}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
 public class NodeCreationConfigurationRO {
 

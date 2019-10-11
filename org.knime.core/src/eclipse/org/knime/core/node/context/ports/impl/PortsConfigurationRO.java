@@ -61,7 +61,7 @@ import org.knime.core.node.port.PortType;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class PortsConfigurationRO implements IPortsConfigurationRO {
+class PortsConfigurationRO implements IPortsConfigurationRO {
 
     /** Map storing the port groups. */
     protected final Map<String, IPortGroupConfiguration> m_portGroups;

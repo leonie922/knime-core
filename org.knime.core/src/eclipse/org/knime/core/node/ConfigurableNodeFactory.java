@@ -50,18 +50,34 @@ package org.knime.core.node;
 
 import java.util.Optional;
 
+import org.knime.core.node.context.NodeCreationConfigurationRO;
 import org.knime.core.node.context.ports.IPortsConfiguration;
 import org.knime.core.node.context.url.IURLConfiguration;
 
 /**
+ * A node factory that supports the creation of nodes that support, e.g., configurable ports or file drag and drop.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @param <T> the concrete type of the {@link NodeModel}
  * @since 4.1
  */
 public abstract class ConfigurableNodeFactory<T extends NodeModel> extends NodeFactory<T> {
 
+    /**
+     * Returns an instance of {@code IURLConfiguration} if the node supports creation via file drag and drop.
+     *
+     * @return an optional instance of {@code IURLConfiguration}
+     */
     public abstract Optional<IURLConfiguration> getURLConfig();
 
+    /**
+     * Returns an instance of {@code IPortsConfiguration} if the node supports configurable input, output or input and
+     * output ports.
+     *
+     * @return an optional instance of {@code IPortsConfiguration}
+     */
     public abstract Optional<IPortsConfiguration> getPortsConfig();
 
+    @Override
+    protected abstract T createNodeModel(final NodeCreationConfigurationRO creationConfig);
 }

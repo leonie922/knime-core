@@ -62,7 +62,7 @@ import org.knime.core.node.context.url.IURLConfiguration;
  * Class storing any additional information required for the appropriate initialization of a {@link NodeModel}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
- * @since 4.1
+ * @noreference This class is not intended to be referenced by clients.
  */
 public final class NodeCreationConfiguration extends NodeCreationConfigurationRO
     implements IDeepCopy<NodeCreationConfiguration>, INodeSettingsSerializable {

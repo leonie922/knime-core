@@ -58,7 +58,7 @@ import org.knime.core.node.port.PortType;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-final class StaticPortGroup implements IPortGroupConfiguration {
+public final class StaticPortGroup implements IPortGroupConfiguration {
 
     private final PortType[] m_pTypes;
 

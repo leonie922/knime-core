@@ -65,12 +65,12 @@ import org.knime.core.node.context.ports.IPortsConfiguration;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class PortsConfiguration extends PortsConfigurationRO implements IPortsConfiguration {
+final class PortsConfiguration extends PortsConfigurationRO implements IPortsConfiguration {
 
     /**
      * @param portGroups
      */
-    protected PortsConfiguration(final Map<String, IPortGroupConfiguration> portGroups) {
+    PortsConfiguration(final Map<String, IPortGroupConfiguration> portGroups) {
         super(portGroups);
     }
 
