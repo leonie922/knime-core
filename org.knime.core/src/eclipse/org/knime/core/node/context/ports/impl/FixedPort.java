@@ -44,19 +44,13 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
+ *   Oct 11, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
 package org.knime.core.node.context.ports.impl;
-
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.stream.IntStream;
 
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExtendablePort;
 import org.knime.core.node.context.ports.IPortGroupConfiguration;
 import org.knime.core.node.port.PortType;
 
@@ -64,90 +58,42 @@ import org.knime.core.node.port.PortType;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  */
-public class ExtendablePort implements IExtendablePort {
+public class FixedPort implements IPortGroupConfiguration {
 
-    private final PortType[] m_requiredPorts;
+    private final PortType[] m_ports;
 
-    private final List<PortType> m_configuredPorts;
-
-    private final boolean m_definesInputPorts;
-
-    private final boolean m_definesOutputPorts;
-
-    private ExtendablePort(final PortType[] requiredPorts, final List<PortType> configuredPorts,
-        final boolean definesInputPorts, final boolean definesOutputPorts) {
-        m_requiredPorts = requiredPorts;
-        m_configuredPorts = configuredPorts;
-        m_definesInputPorts = definesInputPorts;
-        m_definesOutputPorts = definesOutputPorts;
+    private FixedPort(final PortType[] ports) {
+        m_ports = ports;
     }
 
     @Override
-    public boolean definesInputPorts() {
-        return m_definesInputPorts;
-    }
-
-    @Override
-    public boolean definesOutputPorts() {
-        return m_definesOutputPorts;
-    }
-
-    @Override
-    public IPortGroupConfiguration copy() {
-        return new ExtendablePort(m_requiredPorts.clone(), new ArrayList<PortType>(m_configuredPorts),
-            m_definesInputPorts, m_definesOutputPorts);
+    public FixedPort copy() {
+        return new FixedPort(m_ports.clone());
     }
 
     @Override
     public void saveSettingsTo(final NodeSettingsWO settings) {
-        IntStream.range(0, m_configuredPorts.size())//
-            .forEach(idx -> m_configuredPorts.get(idx).save(settings.addNodeSettings("port_" + idx)));
+        // nothing to do
     }
 
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        m_configuredPorts.clear();
-        @SuppressWarnings("unchecked")
-        Enumeration<NodeSettingsRO> children = settings.children();
-        while (children.hasMoreElements()) {
-            m_configuredPorts.add(PortType.load(children.nextElement()));
-        }
+        // nothing to do
     }
 
     @Override
-    public boolean accepts(final PortType pType) {
-        return m_configuredPorts.contains(pType);
+    public PortType[] getPorts() {
+        return m_ports;
     }
 
     @Override
-    public PortType[] getRequiredPorts() {
-        return m_requiredPorts;
+    public boolean definesInputPorts() {
+        return false;
     }
 
     @Override
-    public PortType[] getConfiguredPorts() {
-        return m_configuredPorts.toArray(new PortType[0]);
-    }
-
-    @Override
-    public boolean canAddPort() {
-        // TODO: Is there a use-case where a node can only handle a certain number of additional inputs?
-        return true;
-    }
-
-    @Override
-    public boolean hasConfiguredPorts() {
-        return !m_configuredPorts.isEmpty();
-    }
-
-    @Override
-    public void addPort(final PortType pType) {
-        m_configuredPorts.add(pType);
-    }
-
-    @Override
-    public PortType removeLastPort() {
-        return m_configuredPorts.remove(m_configuredPorts.size() - 1);
+    public boolean definesOutputPorts() {
+        return false;
     }
 
 }
