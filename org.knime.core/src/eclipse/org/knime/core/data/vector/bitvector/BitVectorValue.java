@@ -53,7 +53,6 @@ import org.knime.core.data.DataCell;
 import org.knime.core.data.DataValue;
 import org.knime.core.data.DataValueComparator;
 import org.knime.core.data.ExtensibleUtilityFactory;
-import org.knime.core.data.convert.DataCellFactoryMethod;
 import org.knime.core.data.convert.DataValueAccessMethod;
 import org.knime.core.node.util.SharedIcons;
 
@@ -149,7 +148,7 @@ public interface BitVectorValue extends DataValue {
      *
      * @return the hex representation of this bit vector.
      */
-    @DataCellFactoryMethod(name = "String (Hex)")
+    @DataValueAccessMethod(name = "String (Hex)")
     String toHexString();
 
     /**
