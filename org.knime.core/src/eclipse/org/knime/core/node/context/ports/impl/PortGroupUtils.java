@@ -55,6 +55,7 @@ import org.knime.core.node.port.PortType;
  * Utility class for creating @link {@link IPortGroupConfiguration port group configurations}.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @since 4.1
  */
 public final class PortGroupUtils {
 

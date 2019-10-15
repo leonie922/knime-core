@@ -54,6 +54,7 @@ import org.knime.core.node.port.PortType;
  * Interface defining a node's port configuration.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @noimplement This interface is not intended to be implemented by clients.
  * @since 4.1
  */
 public interface IPortsConfigurationRO {

@@ -58,7 +58,7 @@ import org.knime.core.node.port.PortType;
  * @noreference This interface is not intended to be referenced by clients.
  * @noimplement This interface is not intended to be implemented by clients.
  */
-public interface IExtendablePortGroup extends IPortGroupConfiguration {
+public interface IExtendablePortGroup extends IConfigurablePortGroup {
 
     @Override
     default public PortType[] getInputPorts() {
@@ -75,13 +75,6 @@ public interface IExtendablePortGroup extends IPortGroupConfiguration {
         }
         throw UNSUPPORTED_OUTPUT_OPERATION;
     }
-
-    /**
-     * Returns all supported port types.
-     *
-     * @return all supported port types
-     */
-    PortType[] getSupportedPortTypes();
 
     /**
      * Returns the required ports.

@@ -44,77 +44,25 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Oct 10, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
+ *   Oct 14, 2019 (Mark Ortmann, KNIME GmbH, Berlin, Germany): created
  */
-package org.knime.core.node.context.ports.impl;
+package org.knime.core.node.context.ports;
 
-import org.knime.core.node.InvalidSettingsException;
-import org.knime.core.node.NodeSettingsRO;
-import org.knime.core.node.NodeSettingsWO;
-import org.knime.core.node.context.ports.IExchangeablePortGroup;
 import org.knime.core.node.port.PortType;
 
 /**
- * Implementation of an exchangeable port group.
+ * Interface for all classes that allow modifying a node's ports.
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
+ * @noreference This interface is not intended to be referenced by clients.
+ * @noimplement This interface is not intended to be implemented by clients.
  */
-final class ExchangeablePortGroup implements IExchangeablePortGroup {
+public interface IConfigurablePortGroup extends IPortGroupConfiguration {
 
-    private PortType m_curType;
-
-    private final PortType[] m_supportedTypes;
-
-    private final boolean m_definesInputPorts;
-
-    private final boolean m_definesOutputPorts;
-
-    ExchangeablePortGroup(final PortType defaultType, final PortType[] supportedTypes, final boolean definesInputPorts,
-        final boolean definesOutputPorts) {
-        m_curType = defaultType;
-        m_supportedTypes = supportedTypes;
-        m_definesInputPorts = definesInputPorts;
-        m_definesOutputPorts = definesOutputPorts;
-    }
-
-    @Override
-    public boolean definesInputPorts() {
-        return m_definesInputPorts;
-    }
-
-    @Override
-    public boolean definesOutputPorts() {
-        return m_definesOutputPorts;
-    }
-
-    @Override
-    public ExchangeablePortGroup copy() {
-        return new ExchangeablePortGroup(m_curType, m_supportedTypes, m_definesInputPorts, m_definesOutputPorts);
-    }
-
-    @Override
-    public void saveSettingsTo(final NodeSettingsWO settings) {
-        m_curType.save(settings);
-    }
-
-    @Override
-    public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        setSelectedPortType(PortType.load(settings));
-    }
-
-    @Override
-    public PortType getSelectedPortType() {
-        return m_curType;
-    }
-
-    @Override
-    public PortType[] getSupportedPortTypes() {
-        return m_supportedTypes;
-    }
-
-    @Override
-    public void setSelectedPortType(final PortType pType) {
-        m_curType = pType;
-    }
-
+    /**
+     * Returns all supported port types.
+     *
+     * @return all supported port types
+     */
+    PortType[] getSupportedPortTypes();
 }

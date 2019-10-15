@@ -112,43 +112,7 @@ public final class PortsConfigurationBuilder {
     }
 
     /**
-     * Adds a exchangeable input port group configuration.
-     *
-     * @param pGrpIdentifier the port group identifier
-     * @param defaultType the default port type
-     * @param supportedTypes the supported port types (has to include the default type itself)
-     */
-    public void addExchangeableInputPort(final String pGrpIdentifier, final PortType defaultType,
-        final PortType[] supportedTypes) {
-        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, true, false));
-    }
-
-    /**
-     * Adds a exchangeable output port group configuration.
-     *
-     * @param pGrpIdentifier the port group identifier
-     * @param defaultType the default port type
-     * @param supportedTypes the supported port types (has to include the default type itself)
-     */
-    public void addExchangeableOutputPort(final String pGrpIdentifier, final PortType defaultType,
-        final PortType[] supportedTypes) {
-        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, false, true));
-    }
-
-    /**
-     * Adds a exchangeable port group configuration.
-     *
-     * @param pGrpIdentifier the port group identifier
-     * @param defaultType the default port type
-     * @param supportedTypes the supported port types (has to include the default type itself)
-     */
-    public void addExchangeablePort(final String pGrpIdentifier, final PortType defaultType,
-        final PortType[] supportedTypes) {
-        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, true, true));
-    }
-
-    /**
-     * Adds a extendable input port group configuration.
+     * Adds an extendable input port group configuration.
      *
      * @param pGrpIdentifier the port group identifier
      * @param requiredTypes the required port types
@@ -160,7 +124,7 @@ public final class PortsConfigurationBuilder {
     }
 
     /**
-     * Adds a extendable output port group configuration.
+     * Adds an extendable output port group configuration.
      *
      * @param pGrpIdentifier the port group identifier
      * @param requiredTypes the required port types
@@ -172,7 +136,7 @@ public final class PortsConfigurationBuilder {
     }
 
     /**
-     * Adds a extendable port group configuration.
+     * Adds an extendable port group configuration.
      *
      * @param pGrpIdentifier the port group identifier
      * @param requiredTypes the required port types
@@ -181,6 +145,72 @@ public final class PortsConfigurationBuilder {
     public void addExtendablePort(final String pGrpIdentifier, final PortType[] requiredTypes,
         final PortType[] supportedTypes) {
         m_portConfigs.put(pGrpIdentifier, new ExtendablePortGroup(requiredTypes, supportedTypes, true, true));
+    }
+
+    /**
+     * Adds an optional input port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param optionalPorts the optional port types
+     */
+    public void addOptionalInputPort(final String pGrpIdentifier, final PortType... optionalPorts) {
+        m_portConfigs.put(pGrpIdentifier, new ExtendablePortGroup(new PortType[]{}, optionalPorts, true, false, 1));
+    }
+
+    /**
+     * Adds an optional output port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param optionalPorts the optional port types
+     */
+    public void addOptionalOutputPort(final String pGrpIdentifier, final PortType... optionalPorts) {
+        m_portConfigs.put(pGrpIdentifier, new ExtendablePortGroup(new PortType[]{}, optionalPorts, false, true, 1));
+    }
+
+    /**
+     * Adds an optional port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param optionalPorts the optional port types
+     */
+    public void addOptionalePort(final String pGrpIdentifier, final PortType... optionalPorts) {
+        m_portConfigs.put(pGrpIdentifier, new ExtendablePortGroup(new PortType[]{}, optionalPorts, true, true, 1));
+    }
+
+    /**
+     * Adds an exchangeable input port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param defaultType the default port type
+     * @param supportedTypes the supported port types (has to include the default type itself)
+     */
+    public void addExchangeableInputPort(final String pGrpIdentifier, final PortType defaultType,
+        final PortType[] supportedTypes) {
+        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, true, false));
+    }
+
+    /**
+     * Adds an exchangeable output port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param defaultType the default port type
+     * @param supportedTypes the supported port types (has to include the default type itself)
+     */
+    public void addExchangeableOutputPort(final String pGrpIdentifier, final PortType defaultType,
+        final PortType[] supportedTypes) {
+        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, false, true));
+    }
+
+    /**
+     * Adds an exchangeable port group configuration.
+     *
+     * @param pGrpIdentifier the port group identifier
+     * @param defaultType the default port type
+     * @param supportedTypes the supported port types (has to include the default type itself)
+     */
+    public void addExchangeablePort(final String pGrpIdentifier, final PortType defaultType,
+        final PortType[] supportedTypes) {
+        m_portConfigs.put(pGrpIdentifier, new ExchangeablePortGroup(defaultType, supportedTypes, true, true));
     }
 
 }

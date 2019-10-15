@@ -279,7 +279,7 @@ public final class Node implements NodeModelWarningListener {
         if(creationConfig == null && m_factory instanceof ConfigurableNodeFactory) {
             m_creationConfig = new NodeCreationConfiguration(((ConfigurableNodeFactory<NodeModel>)m_factory));
         } else {
-            m_creationConfig = null;
+            m_creationConfig = creationConfig;
         }
         m_name = m_factory.getNodeName().intern();
         m_model = m_factory.callCreateNodeModel(m_creationConfig);

@@ -55,6 +55,7 @@ import java.net.URL;
  *
  * @author Mark Ortmann, KNIME GmbH, Berlin, Germany
  * @noimplement This interface is not intended to be implemented by clients.
+ * @since 4.1
  */
 public interface IURLConfigurationRO {
 

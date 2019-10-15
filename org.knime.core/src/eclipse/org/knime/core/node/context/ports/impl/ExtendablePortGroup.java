@@ -76,22 +76,32 @@ final class ExtendablePortGroup implements IExtendablePortGroup {
 
     private final boolean m_definesOutputPorts;
 
+    private final int m_maxAdditionalPorts;
+
     ExtendablePortGroup(final PortType[] requiredTypes, final PortType[] supportedTypes,
         final boolean definesInputPorts, final boolean definesOutputPorts) {
+        this(requiredTypes, supportedTypes, definesInputPorts, definesOutputPorts, Integer.MAX_VALUE);
+    }
+
+    ExtendablePortGroup(final PortType[] requiredTypes, final PortType[] supportedTypes,
+        final boolean definesInputPorts, final boolean definesOutputPorts, final int maxAdditionalPorts) {
         m_requiredTypes = requiredTypes;
         m_supportedTypes = supportedTypes;
         m_configuredTypes = new ArrayList<>();
         m_definesInputPorts = definesInputPorts;
         m_definesOutputPorts = definesOutputPorts;
+        m_maxAdditionalPorts = maxAdditionalPorts;
     }
 
     private ExtendablePortGroup(final PortType[] requiredPorts, final PortType[] supportedTypes,
-        final List<PortType> configuredPorts, final boolean definesInputPorts, final boolean definesOutputPorts) {
+        final List<PortType> configuredPorts, final boolean definesInputPorts, final boolean definesOutputPorts,
+        final int maxAdditionalPorts) {
         m_requiredTypes = requiredPorts;
         m_supportedTypes = supportedTypes;
         m_configuredTypes = configuredPorts;
         m_definesInputPorts = definesInputPorts;
         m_definesOutputPorts = definesOutputPorts;
+        m_maxAdditionalPorts = maxAdditionalPorts;
     }
 
     @Override
@@ -107,7 +117,8 @@ final class ExtendablePortGroup implements IExtendablePortGroup {
     @Override
     public ExtendablePortGroup copy() {
         return new ExtendablePortGroup(m_requiredTypes.clone(), m_supportedTypes.clone(),
-            new ArrayList<PortType>(m_configuredTypes), m_definesInputPorts, m_definesOutputPorts);
+            new ArrayList<PortType>(m_configuredTypes), m_definesInputPorts, m_definesOutputPorts,
+            m_maxAdditionalPorts);
     }
 
     @Override
@@ -138,8 +149,7 @@ final class ExtendablePortGroup implements IExtendablePortGroup {
 
     @Override
     public boolean canAddPort() {
-        // TODO: Is there a use-case where a node can only handle a certain number of additional inputs?
-        return true;
+        return m_maxAdditionalPorts > getConfiguredPorts().length;
     }
 
     @Override

@@ -103,7 +103,8 @@ public final class NodeCreationConfiguration extends NodeCreationConfigurationRO
 
     @Override
     public NodeCreationConfiguration copy() {
-        return new NodeCreationConfiguration(m_urlConfig.copy(), m_portsConfig.copy());
+        return new NodeCreationConfiguration(getURLConfig().map(cfg -> cfg.copy()).orElse(null),
+            getPortsConfig().map(cfg -> cfg.copy()).orElse(null));
     }
 
     @Override

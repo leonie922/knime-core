@@ -76,7 +76,14 @@ final class PortsConfiguration extends PortsConfigurationRO implements IPortsCon
 
     @Override
     public IPortsConfiguration copy() {
-        return null;
+        return new PortsConfiguration(m_portGroups.entrySet().stream()//
+            .collect(Collectors.toMap(//
+                e -> e.getKey(), //
+                e -> e.getValue().copy(), //
+                (u, v) -> {
+                    throw new IllegalStateException(String.format("Duplicate key %s", u));
+                }, //
+                LinkedHashMap::new)));
     }
 
     @Override

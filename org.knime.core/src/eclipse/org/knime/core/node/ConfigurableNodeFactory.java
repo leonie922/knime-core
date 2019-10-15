@@ -64,6 +64,19 @@ import org.knime.core.node.context.url.IURLConfiguration;
 public abstract class ConfigurableNodeFactory<T extends NodeModel> extends NodeFactory<T> {
 
     /**
+     *
+     * {@inheritDoc}
+     *
+     * @deprecated framework doesn't invoke this method for classes extending {@code ConfigurableNodeFactory}.
+     */
+    @Override
+    @Deprecated
+    public T createNodeModel() {
+        // never invoked
+        return null;
+    }
+
+    /**
      * Returns an instance of {@code IURLConfiguration} if the node supports creation via file drag and drop.
      *
      * @return an optional instance of {@code IURLConfiguration}

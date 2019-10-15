@@ -57,21 +57,21 @@ import org.knime.core.node.port.PortType;
  * @noreference This interface is not intended to be referenced by clients.
  * @noimplement This interface is not intended to be implemented by clients.
  */
-public interface IExchangeablePortGroup extends IPortGroupConfiguration {
+public interface IExchangeablePortGroup extends IConfigurablePortGroup {
+
+    /**
+     * Sets the selected port type.
+     *
+     * @param pType the port type to be set
+     */
+    public void setSelectedPortType(final PortType pType);
 
     /**
      * Returns the selected port type.
      *
      * @return the selected port type
      */
-    PortType getSelectedPortType();
-
-    /**
-     * Returns all supported port types.
-     *
-     * @return all supported port types
-     */
-    PortType[] getSupportedPortTypes();
+    public PortType getSelectedPortType();
 
     @Override
     default public PortType[] getInputPorts() {
