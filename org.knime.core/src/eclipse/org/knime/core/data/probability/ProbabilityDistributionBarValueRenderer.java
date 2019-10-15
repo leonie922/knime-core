@@ -61,27 +61,35 @@ import java.util.List;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.renderer.AbstractDataValueRendererFactory;
+import org.knime.core.data.renderer.AbstractPainterDataValueRenderer;
 import org.knime.core.data.renderer.DataValueRenderer;
-import org.knime.core.data.renderer.DefaultDataValueRenderer;
 
 /**
  *
  * @author Perla Gjoka, KNIME GmbH, Konstanz, Germany
  */
-public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRenderer {
+public class ProbabilityDistributionBarValueRenderer extends AbstractPainterDataValueRenderer {
 
-    /**
-     *
-     */
     private static DecimalFormat format = new DecimalFormat("##.##");
 
     private static final long serialVersionUID = 1L;
 
-    private static final String DESCRIPTION_PROB_DISTR = "Probability Distribution2";
+    private static final String DESCRIPTION_PROB_DISTR = "Probability Distribution Bar Value";
 
     private final List<ClassProbabilityBar> m_bars = new ArrayList<>();
 
+    private static DataColumnSpec m_spec;
+
+    private ProbabilityDistributionValue m_value;
+
+    private static double m_minProb;
+
+    private static double m_maxProb;
+
+    private static double m_range;
+
     private static class ClassProbability {
+
         private double m_probability;
 
         private String m_classProbability;
@@ -108,16 +116,19 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
 
         private static final long serialVersionUID = 1L;
 
-        private static final int TOTAL_HEIGHT = 50;
-
-        private static final int MARGIN_TOP = 5;
-
-        private static final int BAR_WIDTH = 50;
+        private static final int MARGIN_TOP = 15;
 
         private static final int MARGIN_LEFT = 5;
 
         private final ClassProbability m_classProbability;
 
+        /**
+         *
+         * @param classProbability holds the probability a row belongs to this class.
+         * @param offset helps in positioning the bar, based on the previous painted bars.
+         * @param barWidth holds the width of each of the bars.
+         * @param barHeight holds the height of the cell.
+         */
         public ClassProbabilityBar(final ClassProbability classProbability, final int offset, final double barWidth,
             final double barHeight) {
             super(barWidth * offset + MARGIN_LEFT,
@@ -127,11 +138,12 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
         }
 
         /**
-         * @param classProbability
-         * @return
+         * @param classProbability holds the probability of each class.
+         * @param barHeight holds the height of the cell.
+         * @return the height of the bar to be painted.
          */
         private static double calculateHeight(final ClassProbability classProbability, final double barHeight) {
-            return (int)(classProbability.getProbability() * barHeight);
+            return (((classProbability.getProbability()  - m_minProb) / m_range) * barHeight)+10;
         }
 
         ClassProbability getClassProbability() {
@@ -139,9 +151,29 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
         }
     }
 
-    ProbabilityDistributionValueRenderer2(final DataColumnSpec spec) {
-        super(spec);
-       }
+    ProbabilityDistributionBarValueRenderer(final DataColumnSpec spec) {
+        m_spec = spec;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean accepts(final DataColumnSpec spec) {
+        if (spec.getElementNames() == null || spec.getElementNames().isEmpty()) {
+            return !super.accepts(spec);
+        } else {
+            return super.accepts(spec);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Dimension getPreferredSize() {
+        return new Dimension(m_spec.getElementNames().size() * 50, 60);
+    }
 
     @Override
     public String getDescription() {
@@ -149,7 +181,7 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritDoc} gets the text shown while hovering a bar.
      */
     @Override
     public String getToolTipText(final MouseEvent event) {
@@ -167,8 +199,15 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
     @Override
     protected void paintComponent(final Graphics g) {
         super.paintComponent(g);
+        if (m_value == null) {
+            return;
+        }
+        List<String> probClasses = m_spec.getElementNames();
         Graphics2D g2d = (Graphics2D)g.create();
-        for (ClassProbabilityBar bar : m_bars) {
+        for (int i = 0; i < probClasses.size(); i++) {
+            final ClassProbabilityBar bar =
+                new ClassProbabilityBar(new ClassProbability(m_value.getProbability(i), probClasses.get(i)), i,
+                    (Math.abs(getWidth()) - 10) / m_value.size(), Math.abs(getHeight()) - 20);
             g2d.setPaint(Color.ORANGE);
             g2d.setStroke(new BasicStroke(1));
             g2d.fill(bar);
@@ -179,20 +218,27 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
 
     @Override
     protected void setValue(final Object value) {
-        m_bars.clear();
         if (value instanceof ProbabilityDistributionValue) {
-            List<String> probClasses = getColSpec().getElementNames();
-            ProbabilityDistributionValue probDistrValue = (ProbabilityDistributionValue)value;
-            super.setPreferredSize(new Dimension(probDistrValue.size() * 50 + 10, 60));
-            for (int i = 0; i < probDistrValue.size(); i++) {
-                m_bars.add(
-                    new ClassProbabilityBar(new ClassProbability(probDistrValue.getProbability(i), probClasses.get(i)),
-                        i, (Math.abs(super.getBounds().getX())-10) / probDistrValue.size(),
-                        Math.abs(super.getBounds().getY())-10));
-            }
+            m_value = (ProbabilityDistributionValue)value;
+            calculateMinMaxProbability(m_value);
         } else {
-            super.setValue(value);
+            m_value = null;
         }
+    }
+
+    private static void calculateMinMaxProbability(final ProbabilityDistributionValue value) {
+        m_minProb  = Double.MAX_VALUE;
+        m_maxProb = Double.MIN_VALUE;
+        for (int i = 0; i < m_spec.getElementNames().size(); i++) {
+            double prob = value.getProbability(i);
+            if (prob > m_maxProb) {
+                m_maxProb = prob;
+            }
+            if (prob < m_minProb) {
+                m_minProb = prob;
+            }
+        }
+        m_range = m_maxProb - m_minProb;
     }
 
     /** Renderer factory registered through extension point. */
@@ -205,7 +251,7 @@ public class ProbabilityDistributionValueRenderer2 extends DefaultDataValueRende
 
         @Override
         public DataValueRenderer createRenderer(final DataColumnSpec colSpec) {
-            return new ProbabilityDistributionValueRenderer2(colSpec);
+            return new ProbabilityDistributionBarValueRenderer(colSpec);
         }
     }
 }
