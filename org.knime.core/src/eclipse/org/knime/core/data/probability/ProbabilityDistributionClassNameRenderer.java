@@ -66,13 +66,15 @@ class ProbabilityDistributionClassNameRenderer extends DefaultDataValueRenderer 
      *
      */
     private static DecimalFormat format = new DecimalFormat("##.##");
+
     private static DataColumnSpec m_spec;
+
     private static final long serialVersionUID = 1L;
 
     private static final String DESCRIPTION_PROB_DISTR = "Probability Distribution";
 
     private ProbabilityDistributionClassNameRenderer(final DataColumnSpec spec) {
-         m_spec = spec;
+        m_spec = spec;
     }
 
     /**

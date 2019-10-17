@@ -53,7 +53,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -143,12 +142,17 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
          * @return the height of the bar to be painted.
          */
         private static double calculateHeight(final ClassProbability classProbability, final double barHeight) {
-            return (((classProbability.getProbability()  - m_minProb) / m_range) * barHeight)+10;
+            if (classProbability.getProbability() == 0) {
+                return 0;
+            } else {
+                return (((classProbability.getProbability() - m_minProb) / m_range) * barHeight) + 10;
+            }
         }
 
         ClassProbability getClassProbability() {
             return m_classProbability;
         }
+
     }
 
     ProbabilityDistributionBarValueRenderer(final DataColumnSpec spec) {
@@ -183,16 +187,17 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
     /**
      * {@inheritDoc} gets the text shown while hovering a bar.
      */
-    @Override
-    public String getToolTipText(final MouseEvent event) {
-        for (ClassProbabilityBar bar : m_bars) {
-            if (bar.contains(event.getPoint())) {
-                return bar.getClassProbability().toString();
-            }
-        }
-        return null;
-    }
 
+
+//    @Override
+//    public String getToolTipText(final MouseEvent event) {
+//        for (ClassProbabilityBar bar : m_bars) {
+//            if (bar.contains(event.getPoint())) {
+//                return bar.getClassProbability().toString();
+//            }
+//        }
+//        return null;
+//    }
     /**
      * {@inheritDoc}
      */
@@ -227,7 +232,7 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
     }
 
     private static void calculateMinMaxProbability(final ProbabilityDistributionValue value) {
-        m_minProb  = Double.MAX_VALUE;
+        m_minProb = Double.MAX_VALUE;
         m_maxProb = Double.MIN_VALUE;
         for (int i = 0; i < m_spec.getElementNames().size(); i++) {
             double prob = value.getProbability(i);
