@@ -51,6 +51,7 @@ package org.knime.core.node.context.ports.impl;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.knime.core.node.InvalidSettingsException;
@@ -119,6 +120,14 @@ final class PortsConfiguration extends PortsConfigurationRO implements IPortsCon
                 }, //
                 LinkedHashMap::new)//
         );
+    }
+
+    @Override
+    public IPortGroupConfiguration getGroup(final String grpName) {
+        if (m_portGroups.containsKey(grpName)) {
+            return m_portGroups.get(grpName);
+        }
+        throw new NoSuchElementException("There is no group called \'" + grpName + "\'");
     }
 
 }

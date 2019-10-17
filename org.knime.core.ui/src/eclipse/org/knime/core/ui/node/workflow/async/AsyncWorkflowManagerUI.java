@@ -49,6 +49,7 @@ package org.knime.core.ui.node.workflow.async;
 import java.util.concurrent.CompletableFuture;
 
 import org.knime.core.node.NodeFactory;
+import org.knime.core.node.context.NodeCreationConfiguration;
 import org.knime.core.node.workflow.ConnectionID;
 import org.knime.core.node.workflow.NodeID;
 import org.knime.core.node.workflow.NodeUIInformation;
@@ -90,6 +91,15 @@ public interface AsyncWorkflowManagerUI extends WorkflowManagerUI, AsyncNodeCont
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    default NodeID createAndAddNode(final NodeFactory<?> factory, final NodeUIInformation uiInfo,
+        final NodeCreationConfiguration creationConfig) {
+        throw new UnsupportedOperationException("Please use the async method instead.");
+    }
+
+    /**
      * Async version of {@link #createAndAddNode(NodeFactory, NodeUIInformation)}.
      *
      * @param factory
@@ -97,6 +107,16 @@ public interface AsyncWorkflowManagerUI extends WorkflowManagerUI, AsyncNodeCont
      * @return the result as a future
      */
     CompletableFuture<NodeID> createAndAddNodeAsync(NodeFactory<?> factory, final NodeUIInformation uiInfo);
+
+    /**
+     * Async version of {@link #createAndAddNode(NodeFactory, NodeUIInformation)}.
+     *
+     * @param factory
+     * @param uiInfo
+     * @return the result as a future
+     */
+    CompletableFuture<NodeID> createAndAddNodeAsync(NodeFactory<?> factory, final NodeUIInformation uiInfo,
+        final NodeCreationConfiguration creationConfig);
 
     /**
      * Async version of {@link #remove(NodeID[], ConnectionContainerUI[], WorkflowAnnotationID[])}.

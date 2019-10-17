@@ -49,6 +49,7 @@
 package org.knime.core.node.context.ports;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.knime.core.node.context.IDeepCopy;
 import org.knime.core.node.context.INodeSettingsSerializable;
@@ -77,4 +78,12 @@ public interface IPortsConfiguration
      */
     public Map<String, IExtendablePortGroup> getExtendablePorts();
 
+    /**
+     * Returns the port group configuration for the given group name
+     *
+     * @param grpName the group name
+     * @return the port group configuration for the given group name
+     * @throws NoSuchElementException If there is no configuration for the given group name
+     */
+    public IPortGroupConfiguration getGroup(final String grpName);
 }
