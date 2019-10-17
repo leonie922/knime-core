@@ -48,7 +48,6 @@
  */
 package org.knime.core.data.probability;
 
-import java.text.DecimalFormat;
 import java.util.List;
 
 import org.knime.core.data.DataColumnSpec;
@@ -64,7 +63,6 @@ class ProbabilityDistributionMajorityClassRenderer extends DefaultDataValueRende
     /**
     *
     */
-   private static DecimalFormat format = new DecimalFormat("##.##");
 
    private static DataColumnSpec m_spec;
 
