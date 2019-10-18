@@ -53,6 +53,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -75,7 +76,7 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
 
     private static final String DESCRIPTION_PROB_DISTR = "Probability Distribution Bar Value";
 
-    private final List<ClassProbabilityBar> m_bars = new ArrayList<>();
+    private static List<ClassProbabilityBar> m_bars = new ArrayList<>();
 
     private static DataColumnSpec m_spec;
 
@@ -188,21 +189,22 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
      * {@inheritDoc} gets the text shown while hovering a bar.
      */
 
+    @Override
+    public String getToolTipText(final MouseEvent event) {
+        for (ClassProbabilityBar bar : m_bars) {
+            if (bar.contains(event.getPoint())) {
+                return bar.getClassProbability().toString();
+            }
+        }
+        return null;
+    }
 
-//    @Override
-//    public String getToolTipText(final MouseEvent event) {
-//        for (ClassProbabilityBar bar : m_bars) {
-//            if (bar.contains(event.getPoint())) {
-//                return bar.getClassProbability().toString();
-//            }
-//        }
-//        return null;
-//    }
     /**
      * {@inheritDoc}
      */
     @Override
     protected void paintComponent(final Graphics g) {
+        m_bars.clear();
         super.paintComponent(g);
         if (m_value == null) {
             return;
@@ -210,14 +212,13 @@ public class ProbabilityDistributionBarValueRenderer extends AbstractPainterData
         List<String> probClasses = m_spec.getElementNames();
         Graphics2D g2d = (Graphics2D)g.create();
         for (int i = 0; i < probClasses.size(); i++) {
-            final ClassProbabilityBar bar =
-                new ClassProbabilityBar(new ClassProbability(m_value.getProbability(i), probClasses.get(i)), i,
-                    (Math.abs(getWidth()) - 10) / m_value.size(), Math.abs(getHeight()) - 20);
+            m_bars.add(new ClassProbabilityBar(new ClassProbability(m_value.getProbability(i), probClasses.get(i)), i,
+                (Math.abs(getWidth()) - 10) / m_value.size(), Math.abs(getHeight()) - 20));
             g2d.setPaint(Color.ORANGE);
             g2d.setStroke(new BasicStroke(1));
-            g2d.fill(bar);
+            g2d.fill(m_bars.get(i));
             g2d.setPaint(Color.BLACK);
-            g2d.draw(bar);
+            g2d.draw(m_bars.get(i));
         }
     }
 
