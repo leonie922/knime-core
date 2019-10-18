@@ -51,7 +51,7 @@ package org.knime.core.node;
 import java.util.Optional;
 
 import org.knime.core.node.context.NodeCreationConfigurationRO;
-import org.knime.core.node.context.ports.IPortsConfiguration;
+import org.knime.core.node.context.ports.impl.PortsConfigurationBuilder;
 import org.knime.core.node.context.url.IURLConfiguration;
 
 /**
@@ -85,12 +85,12 @@ public abstract class ConfigurableNodeFactory<T extends NodeModel> extends NodeF
     public abstract Optional<IURLConfiguration> getURLConfig();
 
     /**
-     * Returns an instance of {@code IPortsConfiguration} if the node supports configurable input, output or input and
-     * output ports.
+     * Returns an instance of {@code PortConfigurationBuilder} if the node supports configurable input, output or input
+     * and output ports.
      *
-     * @return an optional instance of {@code IPortsConfiguration}
+     * @return an optional instance of {@link PortsConfigurationBuilder}
      */
-    public abstract Optional<IPortsConfiguration> getPortsConfig();
+    public abstract Optional<PortsConfigurationBuilder> getPortsConfig();
 
     @Override
     protected abstract T createNodeModel(final NodeCreationConfigurationRO creationConfig);

@@ -50,7 +50,7 @@ package org.knime.core.node;
 import java.util.Optional;
 
 import org.knime.core.node.context.NodeCreationConfigurationRO;
-import org.knime.core.node.context.ports.IPortsConfiguration;
+import org.knime.core.node.context.ports.impl.PortsConfigurationBuilder;
 import org.knime.core.node.context.url.IURLConfiguration;
 import org.knime.core.node.context.url.IURLConfigurationRO;
 import org.knime.core.node.context.url.impl.URLConfiguration;
@@ -74,7 +74,7 @@ public abstract class ContextAwareNodeFactory<T extends NodeModel> extends
     }
 
     @Override
-    public Optional<IPortsConfiguration> getPortsConfig() {
+    public Optional<PortsConfigurationBuilder> getPortsConfig() {
         return Optional.empty();
     }
 

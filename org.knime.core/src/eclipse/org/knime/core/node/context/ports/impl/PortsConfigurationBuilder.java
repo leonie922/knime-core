@@ -76,6 +76,7 @@ public final class PortsConfigurationBuilder {
      * Creates the {@code IPortsConfiguration}.
      *
      * @return an instance of {@code IPortsConfiguration}
+     * @noreference This method is not intended to be referenced by clients.
      */
     public IPortsConfiguration build() {
         return new PortsConfiguration(m_portConfigs);

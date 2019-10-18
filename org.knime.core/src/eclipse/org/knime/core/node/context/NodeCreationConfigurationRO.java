@@ -54,6 +54,7 @@ import org.knime.core.node.ConfigurableNodeFactory;
 import org.knime.core.node.NodeModel;
 import org.knime.core.node.context.ports.IPortsConfiguration;
 import org.knime.core.node.context.ports.IPortsConfigurationRO;
+import org.knime.core.node.context.ports.impl.PortsConfigurationBuilder;
 import org.knime.core.node.context.url.IURLConfiguration;
 import org.knime.core.node.context.url.IURLConfigurationRO;
 
@@ -79,7 +80,7 @@ public class NodeCreationConfigurationRO {
      */
     protected NodeCreationConfigurationRO(final ConfigurableNodeFactory<NodeModel> factory) {
         m_urlConfig = factory.getURLConfig().orElse(null);
-        m_portsConfig = factory.getPortsConfig().orElse(null);
+        m_portsConfig = factory.getPortsConfig().map(PortsConfigurationBuilder::build).orElse(null);
     }
 
     /**
