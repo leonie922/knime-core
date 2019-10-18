@@ -72,6 +72,7 @@ public abstract class ConfigurableNodeFactory<T extends NodeModel> extends NodeF
     @Override
     @Deprecated
     public T createNodeModel() {
+        // TODO: exception here?
         // never invoked
         return null;
     }

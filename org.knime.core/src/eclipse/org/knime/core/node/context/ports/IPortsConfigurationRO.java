@@ -48,6 +48,9 @@
  */
 package org.knime.core.node.context.ports;
 
+import java.util.List;
+import java.util.Map;
+
 import org.knime.core.node.port.PortType;
 
 /**
@@ -64,13 +67,34 @@ public interface IPortsConfigurationRO {
      *
      * @return the configured input ports
      */
-    PortType[] getInputPorts();
+    public PortType[] getInputPorts();
 
     /**
      * Returns the configured output ports.
      *
      * @return the configured output ports
      */
-    PortType[] getOutputPorts();
+    public PortType[] getOutputPorts();
+
+    /**
+     * Returns for each input port group its position.
+     *
+     * @return mapping from input port groups to their locations
+     */
+    public Map<String, int[]> getInputPortLocation();
+
+    /**
+     * Returns for each output port group its position.
+     *
+     * @return mapping from output port groups to their locations
+     */
+    public Map<String, int[]> getOutputPortLocation();
+
+    /**
+     * Returns the set of port group names.
+     *
+     * @return the port group names
+     */
+    public List<String> getPortGroupNames();
 
 }

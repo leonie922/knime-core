@@ -48,10 +48,13 @@
  */
 package org.knime.core.node.context.ports.impl;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.knime.core.node.InvalidSettingsException;
@@ -61,6 +64,7 @@ import org.knime.core.node.context.ports.IExchangeablePortGroup;
 import org.knime.core.node.context.ports.IExtendablePortGroup;
 import org.knime.core.node.context.ports.IPortGroupConfiguration;
 import org.knime.core.node.context.ports.IPortsConfiguration;
+import org.knime.core.node.port.PortType;
 
 /**
  *
@@ -130,4 +134,51 @@ final class PortsConfiguration extends PortsConfigurationRO implements IPortsCon
         throw new NoSuchElementException("There is no group called \'" + grpName + "\'");
     }
 
+    @Override
+    public Map<Integer, Integer> mapInputPorts(final IPortsConfiguration otherConfig) {
+        return mapPorts(otherConfig, IPortsConfiguration::getInputPorts, IPortsConfiguration::getInputPortLocation);
+    }
+
+    @Override
+    public Map<Integer, Integer> mapOutputPorts(final IPortsConfiguration otherConfig) {
+        return mapPorts(otherConfig, IPortsConfiguration::getOutputPorts, IPortsConfiguration::getOutputPortLocation);
+    }
+
+    private Map<Integer, Integer> mapPorts(final IPortsConfiguration otherConfig,
+        final Function<IPortsConfiguration, PortType[]> portAccess,
+        final Function<IPortsConfiguration, Map<String, int[]>> locAccess) {
+        if (!isComplatible(otherConfig)) {
+            throw new IllegalArgumentException("The port configurations are incompatible");
+        }
+        final int offset = 1;
+        final HashMap<Integer, Integer> portMapping = new HashMap<>();
+        final PortType[] ports = portAccess.apply(this);
+        final PortType[] otherPorts = portAccess.apply(otherConfig);
+        final Map<String, int[]> otherPortLoc = locAccess.apply(otherConfig);
+        for (Entry<String, int[]> entry : locAccess.apply(this).entrySet()) {
+            if (otherPortLoc.containsKey(entry.getKey())) {
+                final int[] portGrpLoc = entry.getValue();
+                final int[] otherPortGrpLoc = otherPortLoc.get(entry.getKey());
+                final int otherPortGrpLocLength = otherPortGrpLoc.length;
+                for (int i = 0; i < portGrpLoc.length; i++) {
+                    // we don't supported changing of ports within a group
+                    if (i < otherPortGrpLocLength && ports[portGrpLoc[i]].equals(otherPorts[otherPortGrpLoc[i]])) {
+                        portMapping.put(portGrpLoc[i] + offset, otherPortGrpLoc[i] + offset);
+                    } else {
+                        portMapping.put(portGrpLoc[i] + offset, -1);
+                    }
+                }
+            } else {
+                Arrays.stream(entry.getValue()).forEach(idx -> portMapping.put(idx + offset, -1));
+            }
+        }
+        return portMapping;
+    }
+
+    /**
+     * @param otherConfig
+     */
+    private boolean isComplatible(final IPortsConfiguration otherConfig) {
+        return getPortGroupNames().equals(otherConfig.getPortGroupNames());
+    }
 }

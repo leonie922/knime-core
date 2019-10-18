@@ -48,9 +48,14 @@
  */
 package org.knime.core.node.context.ports.impl;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.knime.core.node.context.ports.IPortGroupConfiguration;
@@ -92,6 +97,38 @@ class PortsConfigurationRO implements IPortsConfigurationRO {
             .map(f)//
             .flatMap(Stream::of)//
             .toArray(PortType[]::new);
+    }
+
+    @Override
+    public List<String> getPortGroupNames() {
+        return new ArrayList<String>(m_portGroups.keySet());
+    }
+
+    @Override
+    public Map<String, int[]> getInputPortLocation() {
+        return getPortLocation(IPortGroupConfiguration::definesInputPorts, pGrpCfg -> pGrpCfg.getInputPorts().length);
+    }
+
+    @Override
+    public Map<String, int[]> getOutputPortLocation() {
+        return getPortLocation(IPortGroupConfiguration::definesOutputPorts, pGrpCfg -> pGrpCfg.getOutputPorts().length);
+
+    }
+
+    private Map<String, int[]> getPortLocation(final Predicate<IPortGroupConfiguration> pred,
+        final Function<IPortGroupConfiguration, Integer> f) {
+        final Map<String, int[]> portLoc = new LinkedHashMap<>();
+        final AtomicInteger pos = new AtomicInteger();
+        m_portGroups.entrySet().stream()//
+            .filter(entry -> pred.test(entry.getValue()))//
+            .forEachOrdered(entry -> {
+                final int pLength = f.apply(entry.getValue());
+                if (pLength != 0) {
+                    portLoc.put(entry.getKey(), IntStream.range(pos.get() + 0, pos.get() + pLength).toArray());
+                }
+                pos.addAndGet(pLength);
+            });//
+        return portLoc;
     }
 
 }

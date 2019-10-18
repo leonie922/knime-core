@@ -86,4 +86,24 @@ public interface IPortsConfiguration
      * @throws NoSuchElementException If there is no configuration for the given group name
      */
     public IPortGroupConfiguration getGroup(final String grpName);
+
+    /**
+     * Maps the input ports of this instance onto the input ports of the other config.
+     *
+     * @param otherConfig the config to map onto
+     * @return mapping from input port indices to the input port indices of the other config
+     * @throws IllegalArgumentException If the configs specify different port configurations
+     */
+    public Map<Integer, Integer> mapInputPorts(final IPortsConfiguration otherConfig);
+
+    /**
+     * Maps the output ports of this instance onto the output ports of the other config. Note that the port indices
+     * start with 1 and not 0. Ports that went missing have to map to -1.
+     *
+     * @param otherConfig the config to map onto
+     * @return mapping from output port indices to the output port indices of the other config
+     * @throws IllegalArgumentException If the configs specify different port configurations
+     */
+    public Map<Integer, Integer> mapOutputPorts(final IPortsConfiguration otherConfig);
+
 }
