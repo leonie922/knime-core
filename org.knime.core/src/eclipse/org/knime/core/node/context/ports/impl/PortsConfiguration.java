@@ -99,7 +99,9 @@ final class PortsConfiguration extends PortsConfigurationRO implements IPortsCon
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
         for (Entry<String, IPortGroupConfiguration> entry : m_portGroups.entrySet()) {
-            entry.getValue().loadSettingsFrom(settings.getNodeSettings(entry.getKey()));
+            if (settings.containsKey(entry.getKey())) {
+                entry.getValue().loadSettingsFrom(settings.getNodeSettings(entry.getKey()));
+            }
         }
     }
 

@@ -360,8 +360,6 @@ public class FileNativeNodeContainerPersistor extends FileSingleNodeContainerPer
     private static Optional<NodeCreationConfiguration> loadCreationConfig(final NodeSettingsRO settings,
         final NodeFactory<NodeModel> factory) throws InvalidSettingsException {
         if (factory instanceof ConfigurableNodeFactory) {
-            // TODO: the cast is to specific ... however moving the method to it's super-class causes problems with
-            // the URL shit
             final NodeCreationConfiguration creationConfig =
                 new NodeCreationConfiguration(((ConfigurableNodeFactory<NodeModel>)factory));
             try {

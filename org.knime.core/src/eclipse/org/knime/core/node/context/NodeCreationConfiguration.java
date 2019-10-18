@@ -122,13 +122,15 @@ public final class NodeCreationConfiguration extends NodeCreationConfigurationRO
 
     @Override
     public void loadSettingsFrom(final NodeSettingsRO settings) throws InvalidSettingsException {
-        if (m_urlConfig != null || m_portsConfig != null) {
+        if ((m_urlConfig != null || m_portsConfig != null) && settings.containsKey(NODE_CREATION_CONFIG_KEY)) {
             final NodeSettingsRO creationConfig = settings.getNodeSettings(NODE_CREATION_CONFIG_KEY);
-            if (m_urlConfig != null) {
-                m_urlConfig.loadSettingsFrom(creationConfig);
-            }
-            if (m_portsConfig != null) {
-                m_portsConfig.loadSettingsFrom(creationConfig);
+            if (creationConfig != null) {
+                if (m_urlConfig != null) {
+                    m_urlConfig.loadSettingsFrom(creationConfig);
+                }
+                if (m_portsConfig != null) {
+                    m_portsConfig.loadSettingsFrom(creationConfig);
+                }
             }
         }
     }
