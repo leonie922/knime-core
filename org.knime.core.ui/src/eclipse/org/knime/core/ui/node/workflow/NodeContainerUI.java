@@ -48,6 +48,7 @@
  */
 package org.knime.core.ui.node.workflow;
 
+import java.io.InputStream;
 import java.net.URL;
 
 import org.knime.core.node.InvalidSettingsException;
@@ -339,6 +340,10 @@ public interface NodeContainerUI extends NodeProgressListener, NodeContainerStat
 //    FlowObjectStack getFlowObjectStack();
 
     URL getIcon();
+
+    default InputStream getIconAsStream() {
+        return null;
+    }
 
     NodeType getType();
 

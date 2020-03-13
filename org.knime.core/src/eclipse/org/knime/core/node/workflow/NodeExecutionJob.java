@@ -50,20 +50,13 @@ import java.util.Arrays;
 import java.util.Deque;
 
 import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.Node;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.port.PortObject;
 import org.knime.core.node.port.PortType;
-import org.knime.core.node.port.inactive.InactiveBranchPortObject;
 import org.knime.core.node.util.StringFormat;
-import org.knime.core.node.workflow.WorkflowPersistor.LoadResult;
-import org.knime.core.node.workflow.execresult.NativeNodeContainerExecutionResult;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionResult;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionStatus;
-import org.knime.core.node.workflow.execresult.SubnodeContainerExecutionResult;
-import org.knime.core.node.workflow.execresult.WorkflowExecutionResult;
-import org.knime.core.node.workflow.virtual.subnode.VirtualSubNodeOutputNodeModel;
 
 /** Runnable that represents the execution of a node. This abstract class
  * defines the overall procedure of an execution including setup (e.g. to copy
@@ -203,23 +196,20 @@ public abstract class NodeExecutionJob implements Runnable {
                 m_logger.debug(m_nc.getNameWithID() + " Start execute");
                 if (executeInactive) {
                     SingleNodeContainer snc = (SingleNodeContainer)m_nc;
-                    if (snc instanceof NativeNodeContainer || (snc instanceof SubNodeContainer
-                        && ((SubNodeContainer)snc).getWorkflowManager().isLocalWFM())) {
-                        //in case of a native node or a component with the default executor
-                        status = snc.performExecuteNode(getPortObjects());
-                    } else {
-                        // in case of a component with a custom executor:
-                        // just set all contained nodes to inactive and bypass the executor
-                        ExecutionMonitor exec = new ExecutionMonitor();
-                        LoadResult loadRes = new LoadResult("Inactive");
-                        status = setInactiveDeep(snc, null, exec, loadRes);
-                    }
+                    status = snc.performExecuteNode(getPortObjects());
                 } else {
                     status = mainExecute();
                 }
-                if (status != null && status.isSuccess()) {
-                    String elapsed = StringFormat.formatElapsedTime(System.currentTimeMillis() - time);
-                    m_logger.info(m_nc.getNameWithID() + " End execute (" + elapsed + ")");
+                if (status != null) {
+                    if (status.isSuccess()) {
+                        String elapsed = StringFormat.formatElapsedTime(System.currentTimeMillis() - time);
+                        m_logger.info(m_nc.getNameWithID() + " End execute (" + elapsed + ")");
+                    } else if (m_nc instanceof SubNodeContainer) { //TODO handle try-catch for
+                                                                   //NativeNodeContainers here too!
+                        if (checkForTryCatchScope((SingleNodeContainer)m_nc, status)) {
+                            status = NodeContainerExecutionStatus.SUCCESS;
+                        }
+                    }
                 }
             }
         } catch (Throwable throwable) {
@@ -253,51 +243,34 @@ public abstract class NodeExecutionJob implements Runnable {
     }
 
     /**
-     * Recursively sets all (contained) nodes (and therewith their out ports) to inactive.
+     * Checks whether a node is part of try-catch-scope.
+     *
+     * @param snc the node to check
+     * @param the failure status with the error message to be set on the node after reset
+     * @return <code>true</code> if the error has been caught (try-catch-scope), otherwise <code>false</code>
      */
-    private NodeContainerExecutionStatus setInactiveDeep(final NodeContainer nc, final WorkflowExecutionResult wfmRes,
-        final ExecutionMonitor exec, final LoadResult loadRes) {
-        NodeContainerExecutionResult res;
-        if (nc instanceof NativeNodeContainer) {
-            NativeNodeContainer nnc = (NativeNodeContainer) nc;
-            // doesn't actually execute the node, i.e. won't touch the NodeModel's execute-method because the inports are all inactive
-            // it's the only way to set the node's outputs to inactive port objects
-            nnc.performExecuteNode(createInactivePortObjects(nnc.getNrInPorts()));
-            NativeNodeContainerExecutionResult nativeRes = new NativeNodeContainerExecutionResult();
-            nativeRes.setNodeExecutionResult(nnc.getNode().createInactiveNodeExecutionResult());
-            res = nativeRes;
-        } else if (nc instanceof WorkflowManager) {
-            WorkflowExecutionResult wfmRes2 = new WorkflowExecutionResult(nc.getID());
-            for (NodeContainer n : ((WorkflowManager)nc).getNodeContainers()) {
-                setInactiveDeep(n, wfmRes2, exec, loadRes);
+    private static boolean checkForTryCatchScope(final SingleNodeContainer snc,
+        final NodeContainerExecutionStatus status) {
+        assert !status.isSuccess();
+        //TODO: only be called for SubNodeContainers so far - see NativeNodeContainer.setInactive() -> refactor
+        FlowTryCatchContext tcslc = snc.getFlowObjectStack().peek(FlowTryCatchContext.class);
+        if ((tcslc != null) && (!tcslc.isInactiveScope())) {
+            // failure inside an active try-catch:
+            // make node inactive and preserve error message(s)
+            if (snc.setInactive()) {
+                String errorMessage = (status instanceof NodeContainerExecutionResult)
+                    ? ((NodeContainerExecutionResult)status).getNodeMessage().getMessage() : status.toString();
+                snc.setNodeMessage(NodeMessage.newError("Execution failed in Try-Catch block: " + errorMessage));
+                // and store information such that the catch-node can report it
+                FlowObjectStack fos = snc.getOutgoingFlowObjectStack();
+                fos.push(new FlowVariable(FlowTryCatchContext.ERROR_FLAG, 1));
+                fos.push(new FlowVariable(FlowTryCatchContext.ERROR_NODE, snc.getName()));
+                fos.push(new FlowVariable(FlowTryCatchContext.ERROR_REASON, errorMessage));
+                tcslc.setError(snc.getName(), errorMessage, null);
+                return true;
             }
-            nc.loadExecutionResult(wfmRes2, exec, loadRes);
-            res = wfmRes2;
-        } else {
-            SubNodeContainer snc = (SubNodeContainer) nc;
-            SubnodeContainerExecutionResult subNodeRes = new SubnodeContainerExecutionResult(nc.getID());
-            WorkflowExecutionResult wfmRes2 = new WorkflowExecutionResult(new NodeID(nc.getID(), 0));
-            VirtualSubNodeOutputNodeModel outputNodeModel = snc.getVirtualOutNodeModel();
-            //in order to set the VirtualSubNodeExchange
-            outputNodeModel.setInternalPortObjects(createInactivePortObjects(nc.getNrOutPorts()));
-            subNodeRes.setWorkflowExecutionResult(wfmRes2);
-            for (NodeContainer n : snc.getWorkflowManager().getNodeContainers()) {
-                setInactiveDeep(n, wfmRes2, exec, loadRes);
-            }
-            res = subNodeRes;
         }
-        res.setSuccess(true);
-        nc.loadExecutionResult(res, exec, loadRes);
-        if (wfmRes != null) {
-            wfmRes.addNodeExecutionResult(nc.getID(), res);
-        }
-        return res;
-    }
-
-    private static PortObject[] createInactivePortObjects(final int count) {
-        PortObject[] res = new PortObject[count];
-        Arrays.fill(res, InactiveBranchPortObject.INSTANCE);
-        return res;
+        return false;
     }
 
     private void logError(final Throwable e) {

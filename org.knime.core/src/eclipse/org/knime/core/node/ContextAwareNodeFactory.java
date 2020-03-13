@@ -47,18 +47,43 @@
  */
 package org.knime.core.node;
 
+import java.util.Optional;
+
+import org.knime.core.node.context.NodeCreationConfiguration;
+
 /**
- * This extension of {@link NodeFactory} is used in order to create a new node
- * in a certain context. Implementors who wish that their nodes can be used in a
- * context (e.g. when a file is dropped onto the workflow editor) should extend
- * this class instead of {@link NodeFactory} and register the factory in the
- * plugin.xml (in addition to the normal registration).
+ * This extension of {@link NodeFactory} is used in order to create a new node in a certain context. Implementors who
+ * wish that their nodes can be used in a context (e.g. when a file is dropped onto the workflow editor) should extend
+ * this class instead of {@link NodeFactory} and register the factory in the plugin.xml (in addition to the normal
+ * registration).
  *
  * @param <T> any subclass of {@link NodeModel}
  * @author Thorsten Meinl, University of Konstanz
+ * @deprecated implement {@link ConfigurableNodeFactory} instead
  */
-public abstract class ContextAwareNodeFactory<T extends NodeModel> extends
-        NodeFactory<T> {
+@Deprecated
+public abstract class ContextAwareNodeFactory<T extends NodeModel> extends ConfigurableNodeFactory<T> {
+
+    @Override
+    protected Optional<PortsConfigurationBuilder> createPortsConfigBuilder() {
+        return Optional.empty();
+    }
+
+    @Override
+    protected T createNodeModel(final NodeCreationConfiguration creationConfig) {
+        // if the url config is set it cannot be null - framework takes care
+        if (creationConfig.getURLConfig().isPresent()) {
+            return createNodeModel(new NodeCreationContext(creationConfig.getURLConfig().get().getUrl()));
+        }
+        return createNodeModel();
+    }
+
+    @Override
+    abstract public T createNodeModel();
+
+    @Override
+    abstract protected NodeDialogPane createNodeDialogPane();
+
     /**
      * Creates a new node model.
      *
@@ -67,4 +92,9 @@ public abstract class ContextAwareNodeFactory<T extends NodeModel> extends
      */
     @Override
     public abstract T createNodeModel(final NodeCreationContext context);
+
+    @Override
+    protected NodeDialogPane createNodeDialogPane(final NodeCreationConfiguration creationConfig) {
+        return createNodeDialogPane();
+    }
 }

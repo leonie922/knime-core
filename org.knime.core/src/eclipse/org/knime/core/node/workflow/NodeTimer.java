@@ -117,7 +117,7 @@ import org.osgi.service.prefs.Preferences;
 public final class NodeTimer {
 
     /* For now we use the default store address always. */
-    private static final String SERVER_ADDRESS = "https://www.knime.com/store/rest";
+    private static final String SERVER_ADDRESS = "https://stats.knime.com/store/rest";
             /*"http://localhost:8080/com.knime.store.server/rest"*/
 
     /** Preference constant: send anonymous usage statistics to KNIME, yes or no. */
@@ -127,6 +127,7 @@ public final class NodeTimer {
 
     private final NodeContainer m_parent;
     private long m_startTime;
+    private long m_lastStartTime;
     private long m_lastExecutionDuration;
     private long m_executionDurationSinceReset;
     private long m_executionDurationOverall;
@@ -758,8 +759,24 @@ public final class NodeTimer {
         return m_numberOfExecutionsOverall;
     }
 
+    /**
+     * @return time when node has been started the last time (format is the same as returned by
+     *         {@link System#currentTimeMillis()}), -1 if node hasn't been started, yet
+     */
+    public long getStartTime() {
+        if (m_startTime < 0) {
+            //if node execution has been finished
+            //(or never been started)
+            return m_lastStartTime;
+        } else {
+            //if node is executing atm
+            return m_startTime;
+        }
+    }
+
     private void initialize() {
         m_startTime = -1;
+        m_lastStartTime = -1;
         m_lastExecutionDuration = -1;
         m_executionDurationSinceReset = 0;
         m_numberOfExecutionsSinceReset = 0;
@@ -788,6 +805,7 @@ public final class NodeTimer {
             String cname = getCanonicalName(m_parent);
             GLOBAL_TIMER.addExecutionTime(cname, success, m_lastExecutionDuration);
         }
+        m_lastStartTime = m_startTime;
         m_startTime = -1;
     }
 

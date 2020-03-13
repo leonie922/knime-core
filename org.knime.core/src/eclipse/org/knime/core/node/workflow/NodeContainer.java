@@ -44,10 +44,12 @@
  */
 package org.knime.core.node.workflow;
 
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.knime.core.internal.ReferencedFile;
@@ -81,6 +83,8 @@ import org.knime.core.node.workflow.NodeContainer.NodeContainerSettings.SplitTyp
 import org.knime.core.node.workflow.NodePropertyChangedEvent.NodeProperty;
 import org.knime.core.node.workflow.WorkflowPersistor.LoadResult;
 import org.knime.core.node.workflow.action.InteractiveWebViewsResult;
+import org.knime.core.node.workflow.changes.ChangesTracker;
+import org.knime.core.node.workflow.changes.TrackedChanges;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionResult;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionStatus;
 
@@ -169,6 +173,8 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
 
     private final NodeTimer m_nodeTimer = new NodeTimer(this);
 
+    private ChangesTracker m_changesTracker;
+
     /**
      * semaphore to make sure never try to work on inconsistent internal node
      * states. This semaphore will be used by a node alone to synchronize
@@ -252,7 +258,7 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
         m_nodeLocks = persistor.getNodeLocks();
 
         setNodeMessage(persistor.getNodeMessage());
-        if (!persistor.getLoadHelper().isTemplateFlow()) {
+        if (!persistor.getLoadHelper().isTemplateFlow() || persistor.getLoadHelper().isTemplateProject()) {
             m_nodeContainerDirectory = persistor.getNodeContainerDirectory();
         }
     }
@@ -330,6 +336,74 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
         return m_executionJob;
     }
 
+    /**
+     * Initializes the changes tracker for this node container. Can only be called on workflow- or component projects.
+     *
+     * Pending API! Do not use!
+     *
+     * @since 4.1
+     * @throws IllegalStateException if this node container is neither a workflow project nor a component project
+     * @noreference This method is not intended to be referenced by clients.
+     */
+    public final void initChangesTracker() {
+        if (this instanceof WorkflowManager && !((WorkflowManager)this).isProject()) {
+            throw new IllegalStateException("Not a workflow project");
+        }
+        if (this instanceof SubNodeContainer && !((SubNodeContainer)this).isProject()) {
+            throw new IllegalStateException("Not a component project");
+        }
+        m_changesTracker = new ChangesTracker();
+    }
+
+    /**
+     * Steps through the workflow hierarchy and finds a changes tracker if available. Only the project workflow manager
+     * or project component must have changes tracker set or no node container in the hierarchy.
+     *
+     * Pending API! Do not use!
+     *
+     * @return the changes tracker or an empty optional if not available
+     *
+     * @since 4.1
+     * @noreference This method is not intended to be referenced by clients.
+     */
+    protected final Optional<ChangesTracker> findChangesTracker() {
+        if (this == WorkflowManager.ROOT || getDirectNCParent() == null) {
+            return Optional.empty();
+        } else if (m_changesTracker == null) {
+            return ((NodeContainer)getDirectNCParent()).findChangesTracker();
+        } else {
+            return getChangesTracker();
+        }
+    }
+
+    /**
+     * Gives access to the optionally available changes tracker of this node container.
+     *
+     * Pending API! Do not use!
+     *
+     * @return the changes tracker or an empty optional if not available
+     *
+     * @since 4.1
+     * @noreference This method is not intended to be referenced by clients.
+     */
+    protected final Optional<ChangesTracker> getChangesTracker() {
+        return Optional.ofNullable(m_changesTracker);
+    }
+
+    /**
+     * Optionally provides a representation of tracked changes for this node container and those in the hierarchy below
+     * (in case of workflow managers).
+     *
+     * Pending API! Do not use!
+     *
+     * @return representation of tracked changes, if available
+     * @since 4.1
+     * @noreference This method is not intended to be referenced by clients.
+     */
+    public Optional<TrackedChanges> getTrackedChanges() {
+        return getChangesTracker().map(ct -> ct.getTrackedChanges());
+    }
+
     public boolean addNodePropertyChangedListener(
             final NodePropertyChangedListener l) {
         return m_nodePropertyChangedListeners.add(l);
@@ -347,6 +421,7 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
         for (NodePropertyChangedListener l : m_nodePropertyChangedListeners) {
             l.nodePropertyChanged(e);
         }
+        findChangesTracker().ifPresent(ct -> ct.otherChange());
     }
 
     /////////////////////////////////////////////////
@@ -783,7 +858,10 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
        for (NodeUIInformationListener l : m_uiListeners) {
            l.nodeUIInformationChanged(evt);
        }
-   }
+       if (evt != null) {
+           findChangesTracker().ifPresent(ct -> ct.otherChange());
+       }
+    }
 
    /**
     * Returns the UI information.
@@ -820,6 +898,7 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
         for (NodeStateChangeListener l : m_stateChangeListeners) {
             l.stateChanged(e);
         }
+        findChangesTracker().ifPresent(ct -> ct.nodeStateChange());
     }
 
     /** {@inheritDoc} */
@@ -1218,7 +1297,21 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
      * @since 3.1 */
     public abstract FlowObjectStack getFlowObjectStack();
 
+    /**
+     * @return the icon's URL or <code>null</code> if there is no icon or icon is available as stream (see
+     *         {@link #getIconAsStream()}
+     */
     public abstract URL getIcon();
+
+    /**
+     * @return an icon as input stream or null if there is no icon or the icon is available as URL (see
+     *         {@link #getIcon()}). The input stream encodes the image in PNG format.
+     *
+     * @since 4.1
+     */
+    public InputStream getIconAsStream() {
+        return null;
+    }
 
     public abstract NodeType getType();
 
@@ -1419,6 +1512,7 @@ public abstract class NodeContainer implements NodeProgressListener, NodeContain
         final ReferencedFile ncDirectory = getNodeContainerDirectory();
         assert ncDirectory != null : "NC directory must not be null at this point";
         ncDirectory.setDirty(false);
+        getChangesTracker().ifPresent(ct -> ct.clearChanges());
     }
 
     /**

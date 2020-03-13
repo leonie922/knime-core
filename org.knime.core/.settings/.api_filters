@@ -1,5 +1,37 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <component id="org.knime.core" version="2">
+    <resource path="META-INF/MANIFEST.MF">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="923795461">
+            <message_arguments>
+                <message_argument value="4.2.0"/>
+                <message_argument value="4.1.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.knime.core.node.FSConnectionFlowVariableProvider">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="305324134">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.FSConnectionFlowVariableProvider"/>
+                <message_argument value="org.knime.core_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.knime.core.node.workflow.FSConnectionKeyAccessor">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="305324134">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.FSConnectionKeyAccessor"/>
+                <message_argument value="org.knime.core_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.knime.core.node.workflow.FSConnectionNode">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="305324134">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.FSConnectionNode"/>
+                <message_argument value="org.knime.core_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="META-INF/MANIFEST.MF" type="org.knime.core.util.KnimeURIUtil">
         <filter comment="org.knime.core.KnimeURIUtil transformed to URIUtil" id="305324134">
             <message_arguments>
@@ -94,6 +126,22 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/eclipse/org/knime/core/data/sort/DataTableSorter.java" type="org.knime.core.data.sort.DataTableSorter">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.data.sort.DataTableSorter"/>
+                <message_argument value="sort(ExecutionMonitor)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/data/util/DataTableSpecExtractor.java" type="org.knime.core.data.util.DataTableSpecExtractor">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.data.util.DataTableSpecExtractor"/>
+                <message_argument value="extract(DataTableSpec)"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/eclipse/org/knime/core/node/DynamicNodeFactory.java" type="org.knime.core.node.DynamicNodeFactory">
         <filter id="1141899266">
             <message_arguments>
@@ -108,6 +156,46 @@
             <message_arguments>
                 <message_argument value="KnowsRowCountTable"/>
                 <message_argument value="ExtensionTable"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/Node.java" type="org.knime.core.node.Node">
+        <filter id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.Node"/>
+                <message_argument value="Node(NodeFactory&lt;NodeModel&gt;, NodeCreationContext)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/config/ConfigEditTreeNodePanel.java" type="org.knime.core.node.config.ConfigEditTreeNodePanel">
+        <filter id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.config.ConfigEditTreeNodePanel"/>
+                <message_argument value="ConfigEditTreeNodePanel(boolean)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/config/ConfigEditTreeRenderer.java" type="org.knime.core.node.config.ConfigEditTreeRenderer">
+        <filter id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.config.ConfigEditTreeRenderer"/>
+                <message_argument value="ConfigEditTreeRenderer()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/exec/dataexchange/PortObjectIDSettings.java" type="org.knime.core.node.exec.dataexchange.PortObjectIDSettings">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.exec.dataexchange.PortObjectIDSettings"/>
+                <message_argument value="setFSConnectionFlowVariableProvider(FSConnectionFlowVariableProvider)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/exec/dataexchange/in/PortObjectInNodeModel.java" type="org.knime.core.node.exec.dataexchange.in.PortObjectInNodeModel">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.exec.dataexchange.in.PortObjectInNodeModel"/>
+                <message_argument value="setInputNodeSettings(NodeSettings, int, List&lt;FlowVariable&gt;, boolean)"/>
             </message_arguments>
         </filter>
     </resource>
@@ -140,6 +228,73 @@
             <message_arguments>
                 <message_argument value="SubNodeContainerPersistor"/>
                 <message_argument value="CopySubNodeContainerPersistor"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/workflow/FlowVariable.java" type="org.knime.core.node.workflow.FlowVariable">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)" id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.FlowVariable"/>
+                <message_argument value="FlowVariable(String, FSConnectionFlowVariableValue)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/workflow/VariableType.java" type="org.knime.core.node.workflow.VariableType">
+        <filter comment="Removes FSConnection flow variable type in 4.2.0 (which existed but was @noreference in 4.1.0)&quot;" id="338886760">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.VariableType.FSConnectionType"/>
+                <message_argument value="org.knime.core_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/workflow/WorkflowManager.java" type="org.knime.core.node.workflow.WorkflowManager">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.WorkflowManager"/>
+                <message_argument value="addNode(NodeFactory&lt;?&gt;)"/>
+            </message_arguments>
+        </filter>
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.WorkflowManager"/>
+                <message_argument value="addNodeAndApplyContext(NodeFactory&lt;?&gt;, ModifiableNodeCreationConfiguration)"/>
+            </message_arguments>
+        </filter>
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.node.workflow.WorkflowManager"/>
+                <message_argument value="addNodeAndApplyContext(NodeFactory&lt;?&gt;, NodeCreationContext)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/node/workflow/artifacts/WorkflowConfigArtifactsGenerator.java" type="org.knime.core.node.workflow.artifacts.WorkflowConfigArtifactsGenerator">
+        <filter id="623939596">
+            <message_arguments>
+                <message_argument value="ConfigurationType"/>
+                <message_argument value="WorkflowConfigArtifactsGenerator"/>
+                <message_argument value="CONFIGURATION_REPRESENTATION"/>
+            </message_arguments>
+        </filter>
+        <filter id="623939596">
+            <message_arguments>
+                <message_argument value="ConfigurationType"/>
+                <message_argument value="WorkflowConfigArtifactsGenerator"/>
+                <message_argument value="CONFIGURATION_TEMPLATE"/>
+            </message_arguments>
+        </filter>
+        <filter id="640712815">
+            <message_arguments>
+                <message_argument value="ConfigurationType"/>
+                <message_argument value="WorkflowConfigArtifactsGenerator"/>
+                <message_argument value="getFileName()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/eclipse/org/knime/core/util/GUIDeadlockDetector.java" type="org.knime.core.util.GUIDeadlockDetector">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.core.util.GUIDeadlockDetector"/>
+                <message_argument value="createStacktrace()"/>
             </message_arguments>
         </filter>
     </resource>

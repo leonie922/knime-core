@@ -49,6 +49,7 @@
 package org.knime.core.node.workflow;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -107,7 +108,7 @@ public abstract class VariableType<T> {
                 return false;
             }
             final VariableValue<?> other = (VariableValue<?>)obj;
-            return getType().equals(other.getType()) && m_value.equals(other.m_value);
+            return getType().equals(other.getType()) && Objects.equals(m_value, other.m_value);
         }
 
         T get() {
@@ -120,7 +121,7 @@ public abstract class VariableType<T> {
 
         @Override
         public int hashCode() {
-            return m_value.hashCode();
+            return 31 * m_type.hashCode() + Objects.hashCode(m_value);
         }
 
         void save(final NodeSettingsWO settings) {
@@ -535,6 +536,11 @@ public abstract class VariableType<T> {
             private StringValue(final String string) {
                 super(INSTANCE, string);
             }
+
+            @Override
+            String asString() {
+                return get();
+            }
         }
 
         /**
@@ -647,7 +653,7 @@ public abstract class VariableType<T> {
         public static final CredentialsType INSTANCE = new CredentialsType();
 
         private CredentialsType() {
-           // singleton
+            // singleton
         }
 
         @SuppressWarnings("deprecation")
@@ -674,53 +680,6 @@ public abstract class VariableType<T> {
         }
     }
 
-    /**
-     * Singleton type of {@link FlowVariable} for handling {@link FSConnectionFlowVariableValue} values. The singleton
-     * instance is accessible via the {@link FSConnectionType#INSTANCE} field.
-     *
-     * @since 4.1
-     */
-    public static final class FSConnectionType extends VariableType<FSConnectionFlowVariableValue> {
-
-        private static final class FSConnectionValue extends VariableValue<FSConnectionFlowVariableValue> {
-
-            private FSConnectionValue(final FSConnectionFlowVariableValue c) {
-                super(INSTANCE, c);
-            }
-
-            @Override
-            String asString() {
-                return get().connectionKey();
-            }
-        }
-
-        /**
-         * The singleton instance of the {@link FSConnectionType} type.
-         */
-        public static final FSConnectionType INSTANCE = new FSConnectionType();
-
-        private FSConnectionType() {
-            // singleton
-        }
-
-        @Override
-        VariableValue<FSConnectionFlowVariableValue> loadValue(final NodeSettingsRO settings)
-            throws InvalidSettingsException {
-            return new FSConnectionType.FSConnectionValue(
-                new FSConnectionFlowVariableValue(settings.getString("value")));
-        }
-
-        @Override
-        VariableValue<FSConnectionFlowVariableValue> newValue(final FSConnectionFlowVariableValue v) {
-            return new FSConnectionType.FSConnectionValue(v);
-        }
-
-        @Override
-        void saveValue(final NodeSettingsWO settings, final VariableValue<FSConnectionFlowVariableValue> v) {
-            settings.addString("value", v.get().connectionKey());
-        }
-    }
-
     private static final LazyInitializer<VariableType<?>[]> ALL_TYPES_INITER =
         new LazyInitializer<VariableType<?>[]>() {
 
@@ -737,8 +696,7 @@ public abstract class VariableType<T> {
                     LongArrayType.INSTANCE, //
                     BooleanType.INSTANCE, //
                     BooleanArrayType.INSTANCE, //
-                    CredentialsType.INSTANCE, //
-                    FSConnectionType.INSTANCE, //
+                    CredentialsType.INSTANCE //
                 };
             }
         };

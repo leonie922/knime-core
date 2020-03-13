@@ -88,6 +88,7 @@ import org.knime.core.data.util.NonClosableOutputStream;
 import org.knime.core.data.util.memory.MemoryAlertSystem;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.KNIMEConstants;
 import org.knime.core.node.NodeSettings;
@@ -106,7 +107,7 @@ import org.knime.core.util.FileUtil;
  * <p>
  * Usage: Create a container with a given spec (matching the rows being added later on, add the data using the
  * <code>addRowToTable(DataRow)</code> method and finally close it with <code>close()</code>. You can access the table
- * by <code>getTable()</code>.
+ * via <code>getCloseableTable()</code>.
  *
  * <p>
  * Note regarding the column domain: This implementation updates the column domain while new rows are added to the
@@ -290,9 +291,12 @@ public class DataContainer implements RowAppender {
     private boolean m_forceCopyOfBlobs;
 
     /**
+     * Consider using {@link ExecutionContext#createDataContainer(DataTableSpec)} instead of invoking this constructor
+     * directly.
+     * <p>
      * Opens the container so that rows can be added by <code>addRowToTable(DataRow)</code>. The table spec of the
-     * resulting table (the one being returned by <code>getTable()</code>) will have a valid column domain. That means,
-     * while rows are added to the container, the domain of each column is adjusted.
+     * resulting table (the one being returned by <code>getCloseableTable()</code>) will have a valid column domain.
+     * That means, while rows are added to the container, the domain of each column is adjusted.
      * <p>
      * If you prefer to stick with the domain as passed in the argument, use the constructor
      * <code>DataContainer(DataTableSpec, true,
@@ -306,6 +310,9 @@ public class DataContainer implements RowAppender {
     }
 
     /**
+     * Consider using {@link ExecutionContext#createDataContainer(DataTableSpec, boolean)} instead of invoking this
+     * constructor directly.
+     * <p>
      * Opens the container so that rows can be added by <code>addRowToTable(DataRow)</code>.
      *
      * @param spec Table spec of the final table. Rows that are added to the container must comply with this spec.
@@ -317,6 +324,9 @@ public class DataContainer implements RowAppender {
     }
 
     /**
+     * Consider using {@link ExecutionContext#createDataContainer(DataTableSpec, boolean, int)} instead of invoking this
+     * constructor directly.
+     * <p>
      * Opens the container so that rows can be added by <code>addRowToTable(DataRow)</code>.
      *
      * @param spec Table spec of the final table. Rows that are added to the container must comply with this spec.
@@ -392,7 +402,7 @@ public class DataContainer implements RowAppender {
 
     private void addRowToTableWrite(final DataRow row) {
         // let's do every possible sanity check
-        assert validateSpecCompatiblity(row);
+        validateSpecCompatiblity(row);
         m_domainCreator.updateDomain(row);
         addRowKeyForDuplicateCheck(row.getKey());
         m_buffer.addRow(row, false, m_forceCopyOfBlobs);
@@ -404,7 +414,7 @@ public class DataContainer implements RowAppender {
      * @param row the row to validate
      *
      */
-    private boolean validateSpecCompatiblity(final DataRow row) {
+    private void validateSpecCompatiblity(final DataRow row) {
         int numCells = row.getNumCells();
         RowKey key = row.getKey();
         if (numCells != m_spec.getNumColumns()) {
@@ -438,8 +448,7 @@ public class DataContainer implements RowAppender {
                     + ") in row \"" + key + "\" is " + runtimeType.toString() + " and does "
                     + "not comply with its supposed superclass " + columnClass.toString());
             }
-        }
-        return true;
+        } // for all cells
     }
 
     /**
@@ -614,21 +623,60 @@ public class DataContainer implements RowAppender {
     }
 
     /**
-     * Get reference to table. This method throws an exception unless the container is closed and has therefore a table
-     * available.
+     * Obtain a reference to the table that has been built up. This method throws an exception unless the container is
+     * closed and therefore has a table available. This method is susceptible to resource leaks. Consider invoking
+     * {@link DataContainer#getCloseableTable() getCloseableTable} instead. Alternatively, make sure to cast the table
+     * to a {@link ContainerTable} and {@link ContainerTable#clear() clear} it to dispose underlying resources once it
+     * is no longer needed.
      *
-     * @return Reference to the table that has been built up.
-     * @throws IllegalStateException If <code>isClosed()</code> returns <code>false</code>
+     * @return reference to the table that has been built up
+     * @throws IllegalStateException if the container has not been closed yet or has already been disposed
      */
     public DataTable getTable() {
         return getBufferedTable();
     }
 
     /**
+     * Obtain a one-time-use table that should be used in a <code>try</code>-with-resources block. The resources
+     * underlying the table and the data container are disposed when exiting the <code>try</code>-with-resources block.
+     * This method throws an exception unless the container is closed and therefore has a table available. It also
+     * throws an exception if the container or its underlying resources have already been disposed. If you wish to
+     * obtain the table multiple times, invoke {@link DataContainer#getTable() getTable} instead.
+     *
+     * @return reference to a one-time-use table that, after use, disposes the resources underlying this container
+     * @throws IllegalStateException if the container has not been closed yet or has already been disposed
+     * @since 4.2
+     */
+    public CloseableTable getCloseableTable() {
+        final ContainerTable delegate = getBufferedTable();
+        return new CloseableTable() {
+            @Override
+            public void close() {
+                delegate.clear();
+            }
+
+            @Override
+            public RowIterator iterator() {
+                return delegate.iterator();
+            }
+
+            @Override
+            public DataTableSpec getDataTableSpec() {
+                return delegate.getDataTableSpec();
+            }
+        };
+    }
+
+    /**
      * Disposes this container and all underlying resources.
      *
      * @since 3.1
+     * @deprecated After the container is {@link #close() closed} and its table has been {@link #getTable() obtained},
+     *             it has done its job and you should not dispose its resources directly. Instead, cast the table to a
+     *             {@link ContainerTable} and {@link ContainerTable#clear() clear} it to dispose underlying resources
+     *             once the table is no longer needed.
      */
+    @Deprecated
     public void dispose() {
         m_table.clear();
     }
@@ -1158,12 +1206,16 @@ public class DataContainer implements RowAppender {
      * @since 3.6
      */
     public static final File createTempFile(final String suffix) throws IOException {
+        return createTempFile(FileUtil.getWorkflowTempDir(), suffix);
+    }
+
+    static final File createTempFile(final File dir, final String suffix) throws IOException {
         String date;
         synchronized (DATE_FORMAT) {
             date = DATE_FORMAT.format(new Date());
         }
         String fileName = "knime_container_" + date + "_";
-        File f = FileUtil.createTempFile(fileName, suffix);
+        File f = FileUtil.createTempFile(fileName, suffix, dir, true);
         f.deleteOnExit();
         return f;
     }
@@ -1223,7 +1275,7 @@ public class DataContainer implements RowAppender {
                 if (m_writeThrowable.get() == null) {
                     final List<BlobSupportDataRow> blobRows = new ArrayList<>(m_rows.size());
                     for (final DataRow row : m_rows) {
-                        assert validateSpecCompatiblity(row);
+                        validateSpecCompatiblity(row);
                         m_dataTableDomainCreator.updateDomain(row);
                         addRowKeyForDuplicateCheck(row.getKey());
                         blobRows.add(m_buffer.saveBlobsAndFileStores(row, m_forceCopyOfBlobs));

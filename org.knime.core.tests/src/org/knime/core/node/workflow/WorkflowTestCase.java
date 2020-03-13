@@ -44,6 +44,7 @@
  */
 package org.knime.core.node.workflow;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.BufferedReader;
@@ -54,11 +55,14 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.core.runtime.FileLocator;
 import org.junit.After;
 import org.junit.Assert;
@@ -71,12 +75,23 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.workflow.WorkflowPersistor.LoadResultEntry.LoadResultEntryType;
 import org.knime.core.node.workflow.WorkflowPersistor.WorkflowLoadResult;
+import org.knime.core.util.LoadVersion;
+import org.knime.core.util.ThreadUtils;
+import org.knime.core.util.Version;
 
 /**
  *
  * @author wiswedel, University of Konstanz
  */
 public abstract class WorkflowTestCase {
+
+    /** Names of workflow manager 'roots' that are used by some framework code, e.g. the parent object of all
+     * metanodes in the metanode repository. Used to filter for 'dangling' workflows after test case completion.
+     */
+    public static final String[] KNOWN_CHILD_WFM_NAME_SUBSTRINGS = new String[]{"MetaNode Repository",
+        "Workflow Template Root", "Streamer-Subnode-Parent", WorkflowManager.EXTRACTED_WORKFLOW_ROOT.getName()};
+
+    private static List<NodeContainer> DANGLING_WORKFLOWS = new ArrayList<>();
 
     private final NodeLogger m_logger = NodeLogger.getLogger(getClass());
 
@@ -106,7 +121,17 @@ public abstract class WorkflowTestCase {
 
     protected WorkflowLoadResult loadWorkflow(final File workflowDir, final ExecutionMonitor exec,
         final DataContainerSettings settings) throws Exception {
-        return loadWorkflow(workflowDir, exec, new ConfigurableWorkflowLoadHelper(workflowDir, settings));
+        return loadWorkflow(workflowDir, exec, new ConfigurableWorkflowLoadHelper(workflowDir, settings) {
+            /**
+             * {@inheritDoc}
+             */
+            @Override
+            public UnknownKNIMEVersionLoadPolicy getUnknownKNIMEVersionLoadPolicy(
+                final LoadVersion workflowKNIMEVersion, final Version createdByKNIMEVersion,
+                final boolean isNightlyBuild) {
+                return UnknownKNIMEVersionLoadPolicy.Try;
+            }
+        });
     }
 
 
@@ -458,7 +483,7 @@ public abstract class WorkflowTestCase {
                     condition.await(secToWait, TimeUnit.SECONDS);
                     break;
                 } else {
-                    condition.await(5, TimeUnit.SECONDS);
+                    condition.await(10, TimeUnit.SECONDS);
                 }
             }
         } finally {
@@ -472,23 +497,17 @@ public abstract class WorkflowTestCase {
         closeWorkflow();
 
         // Executed after each test, checks that there are no open workflows dangling around.
-        Collection<NodeContainer> openWorkflows = new ArrayList<>(WorkflowManager.ROOT.getNodeContainers());
-        openWorkflows.removeIf(nc -> {
-            String name = nc.getName();
-            if (name.contains("MetaNode Repository")) {
-                return true;
-            }
-            if (name.contains("Workflow Template Root")) {
-                return true;
-            }
-            if (name.contains("Streamer-Subnode-Parent")) {
-                return true;
-            }
-            return false;
-        });
-        if (!openWorkflows.isEmpty()) {
-            throw new AssertionError(openWorkflows.size() + " dangling workflows detected: " + openWorkflows);
-        }
+        final List<NodeContainer> newDanglingWorkflows = getDanglingWorkflows();
+        newDanglingWorkflows.removeAll(DANGLING_WORKFLOWS);
+        DANGLING_WORKFLOWS = getDanglingWorkflows();
+        assertTrue(newDanglingWorkflows.size() + " new dangling workflow(s) detected: " + newDanglingWorkflows,
+            newDanglingWorkflows.isEmpty());
+    }
+
+    private static ArrayList<NodeContainer> getDanglingWorkflows() {
+        return WorkflowManager.ROOT.getNodeContainers().stream()
+            .filter(nc -> !StringUtils.containsAny(nc.getName(), WorkflowTestCase.KNOWN_CHILD_WFM_NAME_SUBSTRINGS))
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 
     /**
@@ -515,6 +534,10 @@ public abstract class WorkflowTestCase {
                 String error = "Cannot remove workflow, dump follows";
                 m_logger.error(error);
                 dumpWorkflowToLog(m_manager);
+                m_logger.info("########## JVM Call Stacks (start) ##########");
+                dumpLineBreakStringToLog(ThreadUtils.getJVMStacktraces());
+                m_logger.info("########## JVM Call Stacks (end) ############");
+                dumpLineBreakStringToLog(error);
                 fail(error);
             }
             WorkflowManager.ROOT.removeProject(m_manager.getID());

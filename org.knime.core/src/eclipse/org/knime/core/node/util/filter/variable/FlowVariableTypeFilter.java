@@ -57,8 +57,10 @@ import org.knime.core.node.workflow.FlowVariable;
  * Class that filters FlowVariables based on the given set of FlowVariable.Types.
  *
  * @author Patrick Winter, KNIME AG, Zurich, Switzerland
+ * @deprecated use {@link VariableTypeFilter} instead.
  * @since 2.9
  */
+@Deprecated
 public class FlowVariableTypeFilter extends InputFilter<FlowVariableCell> {
 
     private final FlowVariable.Type[] m_filterTypes;

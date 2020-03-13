@@ -50,12 +50,14 @@ package org.knime.core.node.exec.dataexchange.in;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
+import java.net.URISyntaxException;
+import java.util.Optional;
 
+import org.knime.core.data.container.ContainerTable;
+import org.knime.core.data.container.DataContainer;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.ExecutionMonitor;
-import org.knime.core.node.FSConnectionFlowVariableProvider;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.Node;
 import org.knime.core.node.NodeModel;
@@ -63,11 +65,16 @@ import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.exec.dataexchange.PortObjectIDSettings;
+import org.knime.core.node.exec.dataexchange.PortObjectIDSettings.ReferenceType;
 import org.knime.core.node.exec.dataexchange.PortObjectRepository;
 import org.knime.core.node.port.PortObject;
 import org.knime.core.node.port.PortObjectSpec;
 import org.knime.core.node.port.PortType;
+import org.knime.core.node.port.PortUtil;
 import org.knime.core.node.workflow.FlowVariable;
+import org.knime.core.node.workflow.NodeContext;
+import org.knime.core.node.workflow.WorkflowManager;
+import org.knime.core.util.FileUtil;
 
 /**
  * Model for the pass-on node.
@@ -114,16 +121,70 @@ public final class PortObjectInNodeModel extends NodeModel {
 
     /** {@inheritDoc} */
     @Override
-    protected PortObject[] execute(final PortObject[] inData,
-            final ExecutionContext exec) throws Exception {
-        int id = m_portObjectIDSettings.getId();
-        PortObject obj = PortObjectRepository.get(id);
-        if (obj == null) {
-            throw new RuntimeException("No port object for id " + id);
-        }
+    protected PortObject[] execute(final PortObject[] inData, final ExecutionContext exec) throws Exception {
         pushFlowVariables();
-        PortObject cloneOrSelf = m_portObjectIDSettings.isCopyData() ? PortObjectRepository.copy(obj, exec, exec) : obj;
-        return new PortObject[]{cloneOrSelf};
+        return new PortObject[]{getPortObject(exec)};
+    }
+
+    // TODO we might have to revisit this when implementing AP-13335
+    private PortObject getPortObject(final ExecutionContext exec)
+        throws IOException, CanceledExecutionException, URISyntaxException {
+        switch (m_portObjectIDSettings.getReferenceType()) {
+            case NODE:
+                WorkflowManager wfm = NodeContext.getContext().getWorkflowManager();
+                if (wfm != null) {
+                    return wfm.findNodeContainer(m_portObjectIDSettings.getNodeIDSuffix().prependParent(wfm.getID()))
+                        .getOutPort(m_portObjectIDSettings.getPortIdx()).getPortObject();
+                } else {
+                    throw new IllegalStateException("Not a local workflow");
+                }
+            case FILE:
+                return readPOFromURI(exec);
+            case REPOSITORY:
+            default:
+                int id = m_portObjectIDSettings.getId();
+                PortObject obj = PortObjectRepository.get(id);
+                if (obj == null) {
+                    throw new RuntimeException("No port object for id " + id);
+                }
+                PortObject cloneOrSelf =
+                    m_portObjectIDSettings.isCopyData() ? PortObjectRepository.copy(obj, exec, exec) : obj;
+                return cloneOrSelf;
+        }
+    }
+
+    /**
+     * The port object if the reference type is {@link ReferenceType#NODE}, otherwise an empty optional.
+     *
+     * @return the port object of an other referenced node
+     */
+    public Optional<PortObject> getPortObject() {
+        if (m_portObjectIDSettings.getReferenceType() == ReferenceType.NODE) {
+            try {
+                return Optional.of(getPortObject(null));
+            } catch (IOException | CanceledExecutionException | URISyntaxException ex) {
+                //should never happen
+                throw new RuntimeException(ex);
+            }
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    private PortObject readPOFromURI(final ExecutionContext exec)
+        throws IOException, URISyntaxException, CanceledExecutionException {
+        assert m_portObjectIDSettings.getReferenceType() == ReferenceType.FILE;
+        File portFile = FileUtil.resolveToPath(m_portObjectIDSettings.getUri().toURL()).toFile();
+        PortObject po;
+        if (m_portObjectIDSettings.isTable()) {
+            ContainerTable t = DataContainer.readFromZip(portFile);
+            po = exec.createBufferedDataTable(t, exec);
+            t.clear();
+
+        } else {
+            po = PortUtil.readObjectFromFile(portFile, exec);
+        }
+        return po;
     }
 
     /** {@inheritDoc} */
@@ -138,7 +199,6 @@ public final class PortObjectInNodeModel extends NodeModel {
             throws InvalidSettingsException {
         PortObjectIDSettings s = new PortObjectIDSettings();
         s.setCredentialsProvider(getCredentialsProvider());
-        s.setFSConnectionFlowVariableProvider(new FSConnectionFlowVariableProvider(this));
         s.loadSettings(settings);
     }
 
@@ -148,7 +208,6 @@ public final class PortObjectInNodeModel extends NodeModel {
             throws InvalidSettingsException {
         PortObjectIDSettings s = new PortObjectIDSettings();
         s.setCredentialsProvider(getCredentialsProvider());
-        s.setFSConnectionFlowVariableProvider(new FSConnectionFlowVariableProvider(this));
         s.loadSettings(settings);
         m_portObjectIDSettings = s;
     }
@@ -183,23 +242,31 @@ public final class PortObjectInNodeModel extends NodeModel {
      * object with the specified ID and variables (during execute)
      *
      * @param s settings object with settings of this node.
-     * @param portObjectID the ID of the port object to inject
-     * @param flowVariables The flow variables the node should expose
-     * @param copyData Wether to deep-clone data (context switch)
+     * @param portObjectIDSettings the settings to be set
      * @throws InvalidSettingsException if the settings are invalid.
      */
-    public static void setInputNodeSettings(final NodeSettings s,
-            final int portObjectID, final List<FlowVariable> flowVariables, final boolean copyData)
+    public static void setInputNodeSettings(final NodeSettings s, final PortObjectIDSettings portObjectIDSettings)
         throws InvalidSettingsException {
-        PortObjectIDSettings poSettings = new PortObjectIDSettings();
-        poSettings.setId(portObjectID);
-        poSettings.setCopyData(copyData);
-        poSettings.setFlowVariables(flowVariables);
         if (!s.containsKey("model")) {
             s.addNodeSettings("model");
         }
         NodeSettings modelSettings = s.getNodeSettings("model");
-        poSettings.saveSettings(modelSettings);
+        portObjectIDSettings.saveSettings(modelSettings);
+    }
+
+    /**
+     * @return a copy of the settings representing how the provided port object is referenced
+     */
+    public PortObjectIDSettings getInputNodeSettingsCopy() {
+        final NodeSettings settings = new NodeSettings("copy");
+        m_portObjectIDSettings.saveSettings(settings);
+        final PortObjectIDSettings copy = new PortObjectIDSettings();
+        try {
+            copy.loadSettings(settings);
+        } catch (InvalidSettingsException ex) {
+            throw new RuntimeException(ex);
+        }
+        return copy;
     }
 
 }

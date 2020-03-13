@@ -48,6 +48,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -60,6 +61,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
+import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.filestore.FileStorePortObject;
 import org.knime.core.data.filestore.FileStoreUtil;
 import org.knime.core.node.AbstractNodeView.ViewableModel;
@@ -88,8 +90,10 @@ import org.knime.core.node.streamable.RowOutput;
 import org.knime.core.node.streamable.StreamableOperator;
 import org.knime.core.node.streamable.StreamableOperatorInternals;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.node.workflow.CaptureWorkflowStartNode;
 import org.knime.core.node.workflow.CredentialsProvider;
 import org.knime.core.node.workflow.ExecutionEnvironment;
+import org.knime.core.node.workflow.FlowCaptureContext;
 import org.knime.core.node.workflow.FlowLoopContext;
 import org.knime.core.node.workflow.FlowObjectStack;
 import org.knime.core.node.workflow.FlowScopeContext;
@@ -397,9 +401,6 @@ public abstract class NodeModel implements ViewableModel {
      * Unregisters all views from the model.
      */
     final void unregisterAllViews() {
-        m_logger.assertLog(NodeContext.getContext() != null,
-                "No node context available, please check call hierarchy and fix it");
-
         m_logger.debug("Removing all (" + m_views.size() + ") views from model.");
         for (AbstractNodeView<?> view : m_views) {
             view.closeView();
@@ -570,26 +571,36 @@ public abstract class NodeModel implements ViewableModel {
         // temporary storage for result of derived model.
         // EXECUTE DERIVED MODEL
         PortObject[] outData;
-        if (!exEnv.reExecute()) {
-            outData = execute(data, exec);
-        } else {
-            //FIXME: implement reexecution with loading view content and execute
-            if (this instanceof InteractiveNode) {
-                InteractiveNode iThis = (InteractiveNode)this;
-                ViewContent viewContent = exEnv.getPreExecuteViewContent();
-                iThis.loadViewValue(viewContent, exEnv.getUseAsDefault());
-                outData = execute(data, exec);
-            } else if (this instanceof LoopStartNode) {
+        try {
+            if (!exEnv.reExecute()) {
                 outData = execute(data, exec);
             } else {
-                m_logger.coding("Cannot re-execute non interactive node. Using normal execute instead.");
-                outData = execute(data, exec);
+                //FIXME: implement reexecution with loading view content and execute
+                if (this instanceof InteractiveNode) {
+                    InteractiveNode iThis = (InteractiveNode)this;
+                    ViewContent viewContent = exEnv.getPreExecuteViewContent();
+                    iThis.loadViewValue(viewContent, exEnv.getUseAsDefault());
+                    outData = execute(data, exec);
+                } else if (this instanceof LoopStartNode) {
+                    outData = execute(data, exec);
+                } else {
+                    m_logger.coding("Cannot re-execute non interactive node. Using normal execute instead.");
+                    outData = execute(data, exec);
+                }
             }
-        }
 
-        // if execution was canceled without exception flying return false
-        if (exec.isCanceled()) {
-            throw new CanceledExecutionException("Result discarded due to user cancel");
+            // if execution was canceled without exception flying return false
+            if (exec.isCanceled()) {
+                throw new CanceledExecutionException("Result discarded due to user cancel");
+            }
+        } catch (Exception e) {
+            // clear local tables (which otherwise would continue to block resources)
+            final HashMap<Integer, ContainerTable> localTables = exec.getLocalTableRepository();
+            for (ContainerTable localTable : localTables.values()) {
+                localTable.clear();
+            }
+            localTables.clear();
+            throw e;
         }
 
         if (outData == null) {
@@ -1497,7 +1508,7 @@ public abstract class NodeModel implements ViewableModel {
             .map(s -> s.getAvailableFlowVariables(types).entrySet().stream()).orElseGet(Stream::empty),
             Optional.ofNullable(m_outgoingFlowObjectStack)//
             .map(s -> s.getAvailableFlowVariables(types).entrySet().stream()).orElseGet(Stream::empty))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1)));
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, LinkedHashMap::new)));
     }
 
     /**
@@ -1628,6 +1639,9 @@ public abstract class NodeModel implements ViewableModel {
         if (this instanceof LoopStartNode) {
             return new FlowLoopContext();
         }
+        if (this instanceof CaptureWorkflowStartNode) {
+            return new FlowCaptureContext();
+        }
         if (this instanceof ScopeStartNode) {
             return new FlowTryCatchContext();
         }
@@ -1667,7 +1681,32 @@ public abstract class NodeModel implements ViewableModel {
         m_loopEndNode = end;
     }
 
-    private LoopStartNode m_loopStartNode = null;
+    private ScopeStartNode<?> m_scopeStartNode = null;
+
+    /**
+     * Access method for scope end nodes to access their respective scope start.
+     *
+     * @param startNodeType the expected type of the scope start node
+     * @return the scope start of the given type or an empty optional if either the type doesn't match, the node is not
+     *         a scope end or the scope is not correctly closed by the user
+     * @since 4.2
+     */
+    protected final <T extends ScopeStartNode<?>> Optional<T> getScopeStartNode(final Class<T> startNodeType) {
+        if (m_scopeStartNode != null && startNodeType.isAssignableFrom(m_scopeStartNode.getClass())) {
+            return Optional.of(startNodeType.cast(m_scopeStartNode));
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Setter used by framework to update the scope start node.
+     *
+     * @param start the start node of the scope (if this is a scope end node).
+     */
+    void setScopeStartNode(final ScopeStartNode<?> start) {
+        m_scopeStartNode = start;
+    }
 
     /** Access method for loop end nodes to access their respective loop start.
      * This method returns null if this node is not a loop end or the loop is
@@ -1677,13 +1716,13 @@ public abstract class NodeModel implements ViewableModel {
      * @see #getLoopEndNode()
      */
     protected final LoopStartNode getLoopStartNode() {
-        return m_loopStartNode;
+        return getScopeStartNode(LoopStartNode.class).orElse(null);
     }
 
     /** Setter used by framework to update loop start node.
      * @param start The start node of the loop (if this is a end node). */
     void setLoopStartNode(final LoopStartNode start) {
-        m_loopStartNode = start;
+        setScopeStartNode(start);
     }
 
     //////////////////////////////////////////
@@ -1994,4 +2033,3 @@ public abstract class NodeModel implements ViewableModel {
         return m_logger;
     }
 }
-

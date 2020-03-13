@@ -156,6 +156,20 @@ public final class NodeContext {
     }
 
     /**
+     * Removes a context object suppliers that was used for object retrieval via
+     * #{@link NodeContext#getContextObjectForClass(Class)}.
+     *
+     * @param supplier object to remove
+     */
+    public static void removeContextObjectSupplier(final ContextObjectSupplier supplier) {
+        CONTEXT_OBJECT_SUPPLIERS.remove(supplier);
+        if(CONTEXT_OBJECT_SUPPLIERS.isEmpty()) {
+            NodeLogger.getLogger(NodeContext.class).debugWithoutContext(
+                "There are no context object suppliers registered which is likely not intended.");
+        }
+    }
+
+    /**
      * Returns the context object, usually a node which is currently executing or the (root) workflow the node is
      * contained in.
      *
@@ -213,7 +227,7 @@ public final class NodeContext {
         if (KNIMEConstants.ASSERTIONS_ENABLED && obj == null) {
             final NodeLogger logger = NodeLogger.getLogger(NodeContext.class);
             logger.debugWithoutContext("The context object has been garbage collected, you should not have such a context available");
-            logger.debugWithoutContext("Current stacktrace: " + getStackTrace());
+//          logger.debugWithoutContext("Current stacktrace: " + getStackTrace());
 //          logger
 //              .debugWithoutContext("Stacktrace at context construction time: " + m_fullStackTraceAtConstructionTime);
         }

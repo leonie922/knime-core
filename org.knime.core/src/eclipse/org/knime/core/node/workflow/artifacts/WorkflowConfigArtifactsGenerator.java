@@ -55,17 +55,21 @@ import java.util.Map;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.JsonValue;
+import javax.json.JsonValue.ValueType;
 import javax.json.JsonWriter;
 import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
 
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.dialog.DialogNode;
+import org.knime.core.node.dialog.SubNodeDescriptionProvider;
 import org.knime.core.node.workflow.Credentials;
 import org.knime.core.node.workflow.FlowVariable;
 import org.knime.core.node.workflow.WorkflowManager;
 import org.knime.core.node.workflow.WorkflowSaveHook;
 import org.knime.core.util.CoreConstants;
+import org.knime.core.util.CoreConstants.ConfigurationType;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -125,9 +129,24 @@ public class WorkflowConfigArtifactsGenerator extends WorkflowSaveHook {
         Map<String, DialogNode> configurationNodes = wfm.getConfigurationNodes(true);
         if (!configurationNodes.isEmpty()) {
             configurationNodes.entrySet().forEach(e -> {
-                builder.add(e.getKey(), e.getValue().getDefaultValue().toJson());
+                final JsonValue value = e.getValue().getDefaultValue().toJson();
+                if (e.getValue().getDialogRepresentation() instanceof SubNodeDescriptionProvider
+                    && value.getValueType() == ValueType.OBJECT) {
+                    final JsonObject object = enrich((JsonObject)value, "label",
+                        ((SubNodeDescriptionProvider)e.getValue().getDialogRepresentation()).getLabel());
+                    builder.add(e.getKey(), object);
+                } else {
+                    builder.add(e.getKey(), value);
+                }
             });
         }
+    }
+
+    private static JsonObject enrich(final JsonObject source, final String key, final String value) {
+        JsonObjectBuilder builder = Json.createObjectBuilder();
+        builder.add(key, value);
+        source.entrySet().forEach(e -> builder.add(e.getKey(), e.getValue()));
+        return builder.build();
     }
 
     @SuppressWarnings("rawtypes")
@@ -210,31 +229,43 @@ public class WorkflowConfigArtifactsGenerator extends WorkflowSaveHook {
     @Override
     public void onSave(final WorkflowManager workflow, final boolean isSaveData, final File artifactsFolder)
         throws IOException {
+        final JsonObject config = getWorkflowConfiguration(workflow, ConfigurationType.CONFIGURATION_TEMPLATE);
+
+        LOGGER.debug("Writing configuration of workflow " + workflow.getName());
+        try (FileOutputStream fos =
+            new FileOutputStream(new File(artifactsFolder, ConfigurationType.CONFIGURATION_TEMPLATE.getFileName()));
+                JsonWriter out = m_writerFactory.createWriter(fos)) {
+            out.write(config);
+        }
+
+        JsonObject representation = getWorkflowConfiguration(workflow, ConfigurationType.CONFIGURATION_REPRESENTATION);
+        LOGGER.debug("Writing configuration representation of workflow " + workflow.getName());
+        try (FileOutputStream fos = new FileOutputStream(
+            new File(artifactsFolder, ConfigurationType.CONFIGURATION_REPRESENTATION.getFileName()));
+                JsonWriter out = m_writerFactory.createWriter(fos)) {
+            out.write(representation);
+        }
+    }
+
+    /**
+     * Assembles the workflow configuration for the given {@link WorkflowManager}.
+     *
+     * @param workflowManager the workflow manager
+     * @param configurationType the configuration that type that shall be returned.
+     * @return the workflow configuration template
+     */
+    public JsonObject getWorkflowConfiguration(final WorkflowManager workflowManager,
+        final ConfigurationType configurationType) {
+        if (configurationType == ConfigurationType.CONFIGURATION_REPRESENTATION) {
+            return extractTopLevelConfigurationRepresentation(workflowManager);
+        }
+
         final JsonObjectBuilder confBuilder = Json.createObjectBuilder();
 
-        extractTopLevelConfiguration(workflow, confBuilder);
-        extractWorkflowVariables(workflow, confBuilder);
-        extractWorkflowCredentials(workflow, confBuilder);
+        extractTopLevelConfiguration(workflowManager, confBuilder);
+        extractWorkflowVariables(workflowManager, confBuilder);
+        extractWorkflowCredentials(workflowManager, confBuilder);
 
-        final JsonObject config = confBuilder.build();
-
-        if (!config.isEmpty()) {
-            LOGGER.debug("Writing configuration of workflow " + workflow.getName());
-            try (FileOutputStream fos =
-                new FileOutputStream(new File(artifactsFolder, CoreConstants.CONFIGURATION_FILE));
-                    JsonWriter out = m_writerFactory.createWriter(fos)) {
-                out.write(config);
-            }
-        }
-
-        JsonObject representation = extractTopLevelConfigurationRepresentation(workflow);
-        if (!representation.isEmpty()) {
-            LOGGER.debug("Writing configuration representation of workflow " + workflow.getName());
-            try (FileOutputStream fos =
-                new FileOutputStream(new File(artifactsFolder, CoreConstants.CONFIGURATION_REPRESENTATION_FILE));
-                    JsonWriter out = m_writerFactory.createWriter(fos)) {
-                out.write(representation);
-            }
-        }
+        return confBuilder.build();
     }
 }

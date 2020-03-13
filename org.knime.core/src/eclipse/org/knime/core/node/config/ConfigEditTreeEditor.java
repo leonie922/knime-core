@@ -41,7 +41,7 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- * 
+ *
  * History
  *   Apr 4, 2008 (wiswedel): created
  */
@@ -54,6 +54,7 @@ import javax.swing.JTree;
 import javax.swing.tree.DefaultTreeCellEditor;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeCellEditor;
+import javax.swing.tree.TreeNode;
 
 import org.knime.core.node.config.ConfigEditTreeModel.ConfigEditTreeNode;
 import org.knime.core.node.workflow.FlowObjectStack;
@@ -61,6 +62,7 @@ import org.knime.core.node.workflow.FlowObjectStack;
 /** Editor component for {@link ConfigEditJTree} implementation.
  * @author Bernd Wiswedel, University of Konstanz
  */
+//TODO: consider making this class package-scope
 public class ConfigEditTreeEditor extends DefaultTreeCellEditor {
 
     /** Constructs new tree editor.
@@ -69,91 +71,102 @@ public class ConfigEditTreeEditor extends DefaultTreeCellEditor {
      * @see DefaultTreeCellEditor#DefaultTreeCellEditor(
      * JTree, DefaultTreeCellRenderer)
      */
-    public ConfigEditTreeEditor(final ConfigEditJTree myTree, 
+    public ConfigEditTreeEditor(final ConfigEditJTree myTree,
             final ConfigEditTreeRenderer myRenderer) {
         super(myTree, myRenderer);
     }
-    
+
     /** {@inheritDoc} */
     @Override
-    public Component getTreeCellEditorComponent(final JTree myTree, 
-            final Object value, final boolean isSelected, 
+    public Component getTreeCellEditorComponent(final JTree myTree,
+            final Object value, final boolean isSelected,
             final boolean expanded, final boolean leaf, final int row) {
         ((ConfigEditTreeRenderer)super.renderer).setValue(myTree, value);
         return super.getTreeCellEditorComponent(
                 myTree, value, isSelected, expanded, leaf, row);
     }
-    
+
     /** {@inheritDoc} */
     @Override
     protected TreeCellEditor createTreeCellEditor() {
         return new ComponentCreator();
     }
-    
+
     /** {@inheritDoc} */
     @Override
     protected boolean canEditImmediately(final EventObject event) {
         return true;
     }
-    
+
     /** {@inheritDoc} */
     @Override
     public boolean isCellEditable(final EventObject event) {
         return true;
     }
-    
-    /** Factory editor to create the {@link ConfigEditTreeNodePanel}. See
-     * class description of {@link DefaultTreeCellEditor} for details. */
+
+    /**
+     * Factory editor to create the {@link ConfigEditTreeNodePanel}. See class description of
+     * {@link DefaultTreeCellEditor} for details.
+     */
     private final class ComponentCreator extends DefaultTreeCellEditor {
-        
         private final ConfigEditTreeNodePanel m_panelPlain;
         private final ConfigEditTreeNodePanel m_panelFull;
         private ConfigEditTreeNodePanel m_active;
-        
+
         private ComponentCreator() {
             super(new JTree(), new DefaultTreeCellRenderer());
-            m_panelPlain = new ConfigEditTreeNodePanel(false);
-            m_panelFull = new ConfigEditTreeNodePanel(true);
+            m_panelPlain = new ConfigEditTreeNodePanel(false, (ConfigEditTreeRenderer)ConfigEditTreeEditor.this.renderer, true);
+            m_panelFull = new ConfigEditTreeNodePanel(true, (ConfigEditTreeRenderer)ConfigEditTreeEditor.this.renderer, true);
             m_active = m_panelPlain;
         }
 
         /** {@inheritDoc} */
         @Override
-        public Component getTreeCellEditorComponent(final JTree myTree, 
-                final Object value, final boolean isSelected, 
-                final boolean expanded, final boolean leaf, final int row) {
+        public Component getTreeCellEditorComponent(final JTree myTree, final Object value, final boolean isSelected,
+                                                    final boolean expanded, final boolean leaf, final int row) {
             if (value instanceof ConfigEditTreeNode) {
-                ConfigEditTreeNode node = (ConfigEditTreeNode)value;
+                final ConfigEditTreeNode node = (ConfigEditTreeNode)value;
                 m_active = node.isLeaf() ? m_panelFull : m_panelPlain;
                 FlowObjectStack stack = null;
-                JTree outerTree = ConfigEditTreeEditor.this.tree;
+                final JTree outerTree = ConfigEditTreeEditor.this.tree;
                 if (outerTree instanceof ConfigEditJTree) {
                     stack = ((ConfigEditJTree)outerTree).getFlowObjectStack();
                 }
+                final int depth
+                    = ((ConfigEditJTree)ConfigEditTreeEditor.this.tree).getModel().getPathToRoot((TreeNode)value).length;
+                m_active.setTreePathDepth(depth);
                 m_active.setFlowObjectStack(stack);
                 m_active.setTreeNode(node);
-                return m_active;
             } else {
-                m_active = m_panelPlain; 
+                final int depth;
+                if (value instanceof TreeNode) {
+                    depth = ((ConfigEditJTree)ConfigEditTreeEditor.this.tree).getModel().getPathToRoot((TreeNode)value).length;
+                } else {
+                    depth = 0;
+                }
+
+                m_active = m_panelPlain;
+                m_active.setTreePathDepth(depth);
                 m_active.setTreeNode(null);
-                return m_active;
             }
+
+            m_active.updateKeyLabelSize(myTree.getGraphics());
+
+            return m_active;
         }
-        
+
         /** {@inheritDoc} */
         @Override
         public void cancelCellEditing() {
             m_active.commit();
             super.cancelCellEditing();
         }
-        
+
         /** {@inheritDoc} */
         @Override
         public boolean stopCellEditing() {
             m_active.commit();
             return super.stopCellEditing();
         }
-        
     }
-    
 }

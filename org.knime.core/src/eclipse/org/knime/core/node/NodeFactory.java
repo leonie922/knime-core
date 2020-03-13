@@ -62,6 +62,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.xmlbeans.XmlException;
 import org.knime.core.node.config.ConfigRO;
 import org.knime.core.node.config.ConfigWO;
+import org.knime.core.node.context.NodeCreationConfiguration;
 import org.knime.core.node.missing.MissingNodeFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -84,6 +85,8 @@ public abstract class NodeFactory<T extends NodeModel> {
 
     /**
      * Enum for all node types.
+     *
+     * N.B New additions to this enum should also be added to org.knime.workbench.editor2.figures.DisplayableNodeType
      */
     public static enum NodeType {
         /** A data producing node. */
@@ -254,6 +257,15 @@ public abstract class NodeFactory<T extends NodeModel> {
         } while ((propInStream == null) && (clazz != Object.class));
         m_logger.debug("Parsing \"" + path + "\" for node properties.");
         return propInStream;
+    }
+
+    /**
+     * Returns the original node description.
+     *
+     * @return the original node description
+     */
+    NodeDescription getNodeDescription() {
+        return m_nodeDescription;
     }
 
     /**
@@ -450,40 +462,63 @@ public abstract class NodeFactory<T extends NodeModel> {
     public abstract T createNodeModel();
 
     /**
-     * Creates a new node model using a specific context. This method must be overriden by nodes that make use
-     * of contexts.
+     * Creates a new node model using a specific context. This method must be overriden by nodes that make use of
+     * contexts.
      *
      * @param context the node context
      * @return a new {@link NodeModel}
+     * @deprecated use {@link #callCreateNodeModel(NodeCreationConfiguration)} instead
      */
+    @SuppressWarnings("javadoc")
+    @Deprecated
     protected T createNodeModel(final NodeCreationContext context) {
         // normally correct implementations overwrite this
         m_logger.coding("If you register a node to be created in a certain"
-                + " context, you should extend ContextAwareNodeFactory");
+            + " context, you should extend ContextAwareNodeFactory");
         return createNodeModel();
     }
 
     /**
-     * Access method for {@link #createNodeModel()}. If assertions are enabled, this method will
-     * also do sanity checks for the correct labeling of the port description:
-     * The port count (in, out) is only available in the
-     * NodeModel. The first time, this method is called, the port count is
-     * retrieved from the NodeModel and the xml description is validated against
-     * the info from the model. If inconsistencies are identified, log messages
-     * will be written and the full description of the node is adapted such that
-     * the user (preferably the implementor) immediately sees the problem.
+     * Creates a new node model using a specific creation configuration. This method must be overriden by nodes that
+     * make use of creation configurations.
      *
+     * @param creationConfig the node creation configuration
+     * @return a new {@link NodeModel}
+     * @since 4.1
+     */
+    protected T createNodeModel(final NodeCreationConfiguration creationConfig) {
+        // normally correct implementations overwrite this
+        m_logger.coding("If you register a node to be created in a certain"
+            + " context, you should extend ConfigurableNodeFactory");
+        return createNodeModel();
+    }
+
+    /**
+     * Access method for {@link #createNodeModel()}. If assertions are enabled, this method will also do sanity checks
+     * for the correct labeling of the port description: The port count (in, out) is only available in the NodeModel.
+     * The first time, this method is called, the port count is retrieved from the NodeModel and the xml description is
+     * validated against the info from the model. If inconsistencies are identified, log messages will be written and
+     * the full description of the node is adapted such that the user (preferably the implementor) immediately sees the
+     * problem.
+     *
+     * @param creationConfig the creation configuration
+     * @param adaptedDescription the node description
      * @return the model as from createNodeModel()
      */
-    final T callCreateNodeModel(final NodeCreationContext context) {
+    final T callCreateNodeModel(final NodeCreationConfiguration creationConfig,
+        final NodeDescription adaptedDescription) {
         T result;
-        if (context == null) {
+        final NodeDescription description;
+        if (creationConfig == null) {
             result = createNodeModel();
+            description = m_nodeDescription;
         } else {
-            result = createNodeModel(context);
+            assert adaptedDescription != null;
+            result = createNodeModel(creationConfig);
+            description = adaptedDescription;
         }
         if (KNIMEConstants.ASSERTIONS_ENABLED) {
-            checkConsistency(result);
+            checkConsistency(result, description);
         }
         return result;
     }
@@ -564,6 +599,20 @@ public abstract class NodeFactory<T extends NodeModel> {
 
 
     /**
+     * Creates and returns a new node dialog pane, if {@link #hasDialog()} returns <code>true</code>.
+     *
+     * @param creationConfig the node creation configuration
+     * @return a new {@link NodeModel}
+     * @since 4.1
+     */
+    protected NodeDialogPane createNodeDialogPane(final NodeCreationConfiguration creationConfig) {
+        // normally correct implementations overwrite this
+        m_logger.coding("If you register a node to be created in a certain"
+            + " context, you should extend ConfigurableNodeFactory");
+        return createNodeDialogPane();
+    }
+
+    /**
      * Returns the icon for the node.
      *
      * @return the node's icon
@@ -573,36 +622,36 @@ public abstract class NodeFactory<T extends NodeModel> {
     }
 
     /**
-     * Called when the NodeModel is instantiated the first time. We do some
-     * sanity checks here, for instance: Do the number of ports in the xml match
-     * with the port count in the node model...
+     * Called when the NodeModel is instantiated the first time. We do some sanity checks here, for instance: Do the
+     * number of ports in the xml match with the port count in the node model...
      *
      * @param m the NodeModel to check against
+     * @param nodeDescription the node description
      */
-    private void checkConsistency(final NodeModel m) {
-        if (m_nodeDescription instanceof NoDescriptionProxy) {
+    private void checkConsistency(final NodeModel m, final NodeDescription nodeDescription) {
+        if (nodeDescription instanceof NoDescriptionProxy) {
             // no description available at all; this has already been reported
             return;
         }
 
-        if (getNrNodeViews() != m_nodeDescription.getViewCount()) {
+        if (getNrNodeViews() != nodeDescription.getViewCount()) {
             m_logger.coding("Missing or surplus view description");
         }
 
         for (int i = 0; i < m.getNrInPorts(); i++) {
-            if (m_nodeDescription.getInportName(i) == null) {
+            if (nodeDescription.getInportName(i) == null) {
                 m_logger.coding("Missing description for input port " + i);
             }
         }
 
         for (int i = 0; i < m.getNrOutPorts(); i++) {
-            if (m_nodeDescription.getOutportName(i) == null) {
+            if (nodeDescription.getOutportName(i) == null) {
                 m_logger.coding("Missing description for output port " + i);
             }
         }
 
         for (int i = 0; i < m_nodeDescription.getViewCount(); i++) {
-            if (m_nodeDescription.getViewDescription(i) == null) {
+            if (nodeDescription.getViewDescription(i) == null) {
                 m_logger.coding("Missing description for view " + i);
             }
         }

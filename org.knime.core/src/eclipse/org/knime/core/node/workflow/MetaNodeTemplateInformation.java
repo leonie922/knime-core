@@ -48,7 +48,11 @@ package org.knime.core.node.workflow;
 import java.net.URI;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettings;
@@ -121,17 +125,27 @@ public final class MetaNodeTemplateInformation implements Cloneable {
     /** see {@link #getUpdateStatus()}. */
     private UpdateStatus m_updateStatus = UpdateStatus.UpToDate;
 
+    private NodeSettingsRO m_exampleInputDataInfo;
+
+    private List<FlowVariable> m_incomingFlowVariables;
 
     /** Create new metanode template (role {@link Role#None}). */
     private MetaNodeTemplateInformation() {
-        this(Role.None, null, null, null);
+        this(Role.None, null, null, null, null, null);
     }
 
-    /** Create new template with all infos.
+    /**
+     * Create new template with all infos.
+     *
      * @param role The role.
      * @param type the type (non-null for templates, null for links)
+     * @param exampleInputInfo see {@link #getExampleInputDataInfo()}, <code>null</code> if not a component project
+     *            metadata
+     * @param incomingFlowVariables see {@link #getIncomingFlowVariables()}, <code>null</code> if not component project
+     *            metadata
      */
-    private MetaNodeTemplateInformation(final Role role, final TemplateType type, final URI uri, final Date timestamp) {
+    private MetaNodeTemplateInformation(final Role role, final TemplateType type, final URI uri, final Date timestamp,
+        final NodeSettingsRO exampleInputDataInfo, final List<FlowVariable> incomingFlowVariables) {
         if (role == null) {
             throw new NullPointerException("Role must not be null");
         }
@@ -159,6 +173,8 @@ public final class MetaNodeTemplateInformation implements Cloneable {
         default:
             throw new IllegalStateException("Unsupported role " + role);
         }
+        m_exampleInputDataInfo = exampleInputDataInfo;
+        m_incomingFlowVariables = incomingFlowVariables;
     }
 
     /** @return the timestamp date or null if this is not a link. */
@@ -218,15 +234,32 @@ public final class MetaNodeTemplateInformation implements Cloneable {
      *         of this object.
      * @throws IllegalStateException If this object is not a template. */
     public MetaNodeTemplateInformation createLink(final URI sourceURI) {
+        return createLink(sourceURI, false);
+    }
+
+    /**
+     * Create a new link template info based on this template, which is supposed to be accessible under the argument
+     * URI.
+     *
+     * @param sourceURI The sourceURI, must not be null.
+     * @param includeExampleInputDataInfo whether to include the example input data info in the new instance (if info is
+     *            available)
+     * @return a new template linking to the argument URI, using the timestamp of this object.
+     * @throws IllegalStateException If this object is not a template.
+     * @since 4.1
+     */
+    public MetaNodeTemplateInformation createLink(final URI sourceURI, final boolean includeExampleInputDataInfo) {
         if (sourceURI == null) {
             throw new NullPointerException("Can't create link to null URI");
         }
         switch (getRole()) {
         case Template:
             Date ts = getTimestamp();
-            assert ts != null : "Templates must not have null timestamp";
-            return new MetaNodeTemplateInformation(Role.Link, null, sourceURI, ts);
-        default:
+                assert ts != null : "Templates must not have null timestamp";
+                return new MetaNodeTemplateInformation(Role.Link, null, sourceURI, ts,
+                    includeExampleInputDataInfo ? m_exampleInputDataInfo : null,
+                    includeExampleInputDataInfo ? m_incomingFlowVariables : null);
+            default:
             throw new IllegalStateException("Can't link to metanode of role"
                     + " \"" + getRole() + "\" (URI: \"" + sourceURI + "\")");
         }
@@ -250,13 +283,33 @@ public final class MetaNodeTemplateInformation implements Cloneable {
         case Link:
             Date ts = getTimestamp();
             assert ts != null : "Templates must not have null timestamp";
-            MetaNodeTemplateInformation newInfo = new MetaNodeTemplateInformation(Role.Link, null, newSource, ts);
+            MetaNodeTemplateInformation newInfo
+                = new MetaNodeTemplateInformation(Role.Link, null, newSource, ts, null, null);
             newInfo.m_updateStatus = m_updateStatus;
             return newInfo;
         default:
             throw new InvalidSettingsException("Can't link to metanode of role"
                     + " \"" + getRole() + "\" (URI: \"" + m_sourceURI + "\")");
         }
+    }
+
+    /**
+     * @return example input data stored with a component template/project (i.e. a component not embedded in a
+     *         workflow), or an empty optional, if non available
+     *
+     * @since 4.1
+     */
+    public Optional<NodeSettingsRO> getExampleInputDataInfo() {
+        return Optional.ofNullable(m_exampleInputDataInfo);
+    }
+
+    /**
+     * @return incoming flow variables stored with a component template/project (i.e. component not embedded in a
+     *         workflow). Never <code>null</code>, possibly empty
+     * @since 4.1
+     */
+    public List<FlowVariable> getIncomingFlowVariables() {
+        return m_incomingFlowVariables;
     }
 
     /** Key for workflow template information. */
@@ -266,6 +319,19 @@ public final class MetaNodeTemplateInformation implements Cloneable {
      * @param settings To save to.
      */
     public void save(final NodeSettingsWO settings) {
+        save(settings, false);
+    }
+
+    /**
+     * Saves this object to the argument settings, optionally including the information about example input data. The
+     * later is only required if the respective node is a "shared" template, i.e. stored outside of a workflow. In that
+     * case, the information is eventually stored into the {@link WorkflowPersistor#TEMPLATE_FILE} file.
+     *
+     * @param settings to save to
+     *
+     * @since 4.1
+     */
+    private void save(final NodeSettingsWO settings, final boolean withExampleInputDataInfo) {
         if (!Role.None.equals(m_role)) {
             NodeSettingsWO nestedSettings = settings.addNodeSettings(CFG_TEMPLATE_INFO);
             nestedSettings.addString("role", m_role.name());
@@ -276,8 +342,25 @@ public final class MetaNodeTemplateInformation implements Cloneable {
             if (Role.Template.equals(m_role)) {
                 nestedSettings.addString("templateType", m_type.name());
             }
+            if (withExampleInputDataInfo) {
+                if (m_exampleInputDataInfo != null) {
+                    NodeSettingsWO exampleInputDataInfo = nestedSettings.addNodeSettings("exampleInputDataInfo");
+                    m_exampleInputDataInfo.copyTo(exampleInputDataInfo);
+                }
+                if (m_incomingFlowVariables != null && !m_incomingFlowVariables.isEmpty()) {
+                    NodeSettingsWO incomingFlowVarSettings = nestedSettings.addNodeSettings("incomingFlowVariables");
+                    int i = 0;
+                    for (FlowVariable fv : m_incomingFlowVariables) {
+                        if (!fv.isGlobalConstant()) {
+                            fv.save(incomingFlowVarSettings.addNodeSettings("Var_" + (i++)));
+                        }
+                    }
+                }
+            }
         }
     }
+
+
 
     /** {@inheritDoc} */
     @Override
@@ -330,8 +413,23 @@ public final class MetaNodeTemplateInformation implements Cloneable {
     public static MetaNodeTemplateInformation createNewTemplate(
         final Class<? extends NodeContainerTemplate> cl) {
         TemplateType type = TemplateType.get(cl);
-        return new MetaNodeTemplateInformation(Role.Template, type, null, new Date());
+        return new MetaNodeTemplateInformation(Role.Template, type, null, new Date(), null, null);
     }
+
+    /**
+     * Creates the template information object for a component that also includes example input data.
+     *
+     * @param exampleInputDataInfo infos on the example input data, such as location, file names, port types
+     * @param incomingFlowVariables incoming flow variables to be stored with the template
+     * @return A new template info representing the template itself. The time stamp is set to the current time.
+     * @since 4.1
+     */
+    public static MetaNodeTemplateInformation createNewTemplate(final NodeSettingsRO exampleInputDataInfo,
+        final List<FlowVariable> incomingFlowVariables) {
+        return new MetaNodeTemplateInformation(Role.Template, TemplateType.SubNode, null, new Date(),
+            exampleInputDataInfo, incomingFlowVariables);
+    }
+
 
     /** Load information from argument, throw {@link InvalidSettingsException}
      * if that fails.
@@ -341,8 +439,23 @@ public final class MetaNodeTemplateInformation implements Cloneable {
      * @throws InvalidSettingsException If that fails.
      * @since 3.7
      */
-    public static MetaNodeTemplateInformation load(final NodeSettingsRO settings,
-        final LoadVersion version) throws InvalidSettingsException {
+    public static MetaNodeTemplateInformation load(final NodeSettingsRO settings, final LoadVersion version)
+        throws InvalidSettingsException {
+        return load(settings, version, false);
+    }
+
+    /**
+     * Load information from argument, throws a {@link InvalidSettingsException} if that fails.
+     *
+     * @param settings To load from.
+     * @param version The version this workflow is loading from
+     * @param withExampleInputDataInfo if the info about example input data should be loaded too (only makes sense if
+     *            template is directly opened in the workflow editor as a project and not embedded in a workflow)
+     * @return a new template loading from the argument settings.
+     * @throws InvalidSettingsException If that fails.
+     */
+    static MetaNodeTemplateInformation load(final NodeSettingsRO settings, final LoadVersion version,
+        final boolean withExampleInputDataInfo) throws InvalidSettingsException {
         if (!settings.containsKey(CFG_TEMPLATE_INFO)) {
             return NONE;
         }
@@ -375,7 +488,26 @@ public final class MetaNodeTemplateInformation implements Cloneable {
         default:
             throw new InvalidSettingsException("Unsupported role: " + role);
         }
-        return new MetaNodeTemplateInformation(role, templateType, sourceURI, timestamp);
+
+
+        NodeSettingsRO exampleInputDataInfo = null;
+        List<FlowVariable> incomingFlowVariables = Collections.emptyList();
+        if (withExampleInputDataInfo) {
+            // added in 4.1, load example input data meta info
+            if (nestedSettings.containsKey("exampleInputDataInfo")) {
+                exampleInputDataInfo = nestedSettings.getNodeSettings("exampleInputDataInfo");
+            }
+            if (nestedSettings.containsKey("incomingFlowVariables")) {
+                NodeSettingsRO flowVarSettings = nestedSettings.getNodeSettings("incomingFlowVariables");
+                incomingFlowVariables = new ArrayList<FlowVariable>();
+                for (String key : flowVarSettings.keySet()) {
+                    incomingFlowVariables.add(FlowVariable.load(flowVarSettings.getNodeSettings(key)));
+                }
+            }
+        }
+
+        return new MetaNodeTemplateInformation(role, templateType, sourceURI, timestamp, exampleInputDataInfo,
+            incomingFlowVariables);
     }
 
     /** @param settings
@@ -438,7 +570,7 @@ public final class MetaNodeTemplateInformation implements Cloneable {
     static NodeSettings createNodeSettingsForTemplate(final NodeContainerTemplate template) {
         NodeSettings settings = new NodeSettings(Role.Template.toString());
         FileWorkflowPersistor.saveHeader(settings);
-        template.getTemplateInformation().save(settings);
+        template.getTemplateInformation().save(settings, true);
         FileWorkflowPersistor.saveWorkflowCipher(settings, template.getWorkflowCipher());
         return settings;
     }

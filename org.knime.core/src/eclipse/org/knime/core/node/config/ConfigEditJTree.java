@@ -49,6 +49,10 @@ package org.knime.core.node.config;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -67,46 +71,59 @@ import org.knime.core.node.workflow.FlowObjectStack;
  * <p>This class is not meant for public use.
  * @author Bernd Wiswedel, University of Konstanz
  */
+@SuppressWarnings("serial")
 public class ConfigEditJTree extends JTree {
+    // Part of implementing AP-11595 featured, for a moment in time, an attempt to fill the width; that functionality
+    //      is enabled or disabled by this flag.
+    static final boolean ROW_SHOULD_FILL_WIDTH = false;
 
     /** Fallback model. */
-    private static final ConfigEditTreeModel EMPTY_MODEL =
-        ConfigEditTreeModel.create(new NodeSettings("empty"));
+    private static final ConfigEditTreeModel EMPTY_MODEL = ConfigEditTreeModel.create(new NodeSettings("empty"));
+
 
     /** To get the available variables from. */
     private FlowObjectStack m_flowObjectStack;
+
+    /** The maximum width of all rendered key labels */
+    private final HashMap<Integer, Integer> m_maxLabelWidthPathDepthMap;
+    /** A holder for the currently running, if any, model forced refresh timer */
+    private final List<Runnable> m_forcedModelRefreshTimer = new ArrayList<>();
 
     /** Constructor for empty tree. */
     public ConfigEditJTree() {
         this(EMPTY_MODEL);
     }
 
-    /** Shows given tree model.
-     * @param model The model to show. */
+    /**
+     * Shows given tree model.
+     *
+     * @param model The model to show.
+     */
     public ConfigEditJTree(final ConfigEditTreeModel model) {
         super(model);
         setRootVisible(false);
         setShowsRootHandles(true);
-        ConfigEditTreeRenderer renderer = new ConfigEditTreeRenderer();
+        final ConfigEditTreeRenderer renderer = new ConfigEditTreeRenderer(this);
         setCellRenderer(renderer);
         setCellEditor(new ConfigEditTreeEditor(this, renderer));
         setRowHeight(renderer.getPreferredSize().height);
         setEditable(true);
         setToolTipText("config tree"); // enable tooltip
+        m_maxLabelWidthPathDepthMap = new HashMap<>();
     }
 
-    /** Overwritten to fail on model implementations which are not of class
-     * {@link ConfigEditTreeModel}.
-     * {@inheritDoc} */
+    /**
+     * Overwritten to fail on model implementations which are not of class {@link ConfigEditTreeModel}.
+     *
+     * {@inheritDoc}
+     */
     @Override
     public void setModel(final TreeModel newModel) {
         if (!(newModel instanceof ConfigEditTreeModel)) {
-            throw new IllegalArgumentException("Argument must be of class "
-                    + ConfigEditTreeModel.class.getSimpleName());
+            throw new IllegalArgumentException("Argument must be of class " + ConfigEditTreeModel.class.getSimpleName());
         }
+
         super.setModel(newModel);
-        // not sure whether to better expand all entries, seems ok either way?
-//        expandAll();
     }
 
     /** Expand the tree. */
@@ -114,6 +131,44 @@ public class ConfigEditJTree extends JTree {
         for (int i = 0; i < getRowCount(); i++) {
             expandRow(i);
         }
+    }
+
+    /**
+     * This method will only ever be called from EDT during pai.
+     *
+     * @param depth the tree depth of the row with the label
+     * @param width the width of the {@code JLabel} component that has been rendered in
+     *            {@link ConfigEditTreeRenderer#paintComponent(java.awt.Graphics)}
+     */
+    void renderedKeyLabelAtDepthWithWidth(final int depth, final int width) {
+        final Integer key = Integer.valueOf(depth);
+        final Integer labelWidth = m_maxLabelWidthPathDepthMap.get(key);
+        final boolean needsForcedRefresh = (labelWidth == null) || (width > labelWidth.intValue());
+
+        if (needsForcedRefresh) {
+            m_maxLabelWidthPathDepthMap.put(key, Integer.valueOf(width));
+
+            synchronized (m_forcedModelRefreshTimer) {
+                if (m_forcedModelRefreshTimer.size() == 0) {
+                    final ForcedModelRefreshTrigger trigger = new ForcedModelRefreshTrigger();
+                    m_forcedModelRefreshTimer.add(trigger);
+                    (new Thread(trigger)).start();
+                } else {
+                    ((ForcedModelRefreshTrigger)m_forcedModelRefreshTimer.get(0)).retriggerTimer();
+                }
+            }
+        }
+    }
+
+    /**
+     * @param depth the tree depth of the row with the label
+     * @return the width which a key label being rendered should be set to, or -1 if the max width hasn't been defined
+     */
+    int labelWidthToEnforceForDepth(final int depth) {
+        final Integer key = Integer.valueOf(depth);
+        final Integer labelWidth = m_maxLabelWidthPathDepthMap.get(key);
+
+        return (labelWidth != null) ? labelWidth.intValue() : -1;
     }
 
     /** {@inheritDoc} */
@@ -132,9 +187,50 @@ public class ConfigEditJTree extends JTree {
         return m_flowObjectStack;
     }
 
-    /** Public testing method that displays a simple tree with no flow
-     * variable stack, though.
-     * @param args command line args, ignored here. */
+
+    /*
+     * This forces the model to be told that all of its nodes have changed, which in turn repaints them. The reason
+     *  a simple {@link #repaint()} invocation fails is that if a row's content is out of the viewport, but at
+     *  whose paint-time, its clip rectangle was computed to be what is now too small (because a row after it
+     *  had a pixel-wider label string and so the subject row's label size grew) the repainter will deem the
+     *  out-of-viewport-bounds not dirtied.)
+     */
+    private class ForcedModelRefreshTrigger implements Runnable {
+        private final AtomicBoolean m_retrigger;
+
+        private ForcedModelRefreshTrigger() {
+            m_retrigger = new AtomicBoolean(false);
+        }
+
+        private void retriggerTimer() {
+            m_retrigger.set(true);
+        }
+
+        @Override
+        public void run() {
+            boolean sleep = true;
+
+            while (sleep) {
+                try {
+                    Thread.sleep(80);
+                } catch (final Exception e) { } // NOPMD
+
+                sleep = m_retrigger.getAndSet(false);
+            }
+
+            getModel().forceModelRefresh(ConfigEditJTree.this);
+
+            synchronized (m_forcedModelRefreshTimer) {
+                m_forcedModelRefreshTimer.remove(0);
+            }
+        }
+    }
+
+    /**
+     * Public testing method that displays a simple tree with no flow variable stack, though.
+     *
+     * @param args command line args, ignored here.
+     */
     public static void main(final String[] args) {
         NodeSettings settings = new NodeSettings("Demo");
         settings.addString("String_Demo", "This is a demo string");
@@ -154,5 +250,4 @@ public class ConfigEditJTree extends JTree {
         frame.pack();
         frame.setVisible(true);
     }
-
 }

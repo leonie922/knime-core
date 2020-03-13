@@ -61,6 +61,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -79,6 +80,8 @@ import org.knime.core.data.filestore.internal.IFileStoreHandler;
 import org.knime.core.data.filestore.internal.IWriteFileStoreHandler;
 import org.knime.core.internal.ReferencedFile;
 import org.knime.core.node.NodeFactory.NodeType;
+import org.knime.core.node.context.ModifiableNodeCreationConfiguration;
+import org.knime.core.node.context.NodeCreationConfiguration;
 import org.knime.core.node.dialog.ValueControlledDialogPane;
 import org.knime.core.node.dialog.ValueControlledNode;
 import org.knime.core.node.interactive.InteractiveNode;
@@ -245,6 +248,10 @@ public final class Node implements NodeModelWarningListener {
     // cases then
     private final Object m_configureLock = new Object();
 
+    private final ModifiableNodeCreationConfiguration m_creationConfig;
+
+    private final NodeDescription m_adaptedNodeDescription;
+
     /**
      * Creates a new node by retrieving the model, dialog, and views, from the
      * specified <code>NodeFactory</code>. Also initializes the input and output
@@ -260,22 +267,40 @@ public final class Node implements NodeModelWarningListener {
         this(nodeFactory, null);
     }
 
-    public Node(final NodeFactory<NodeModel> nodeFactory,
-            final NodeCreationContext context) {
+    /**
+     * Constructor.
+     *
+     * @param nodeFactory the node factory
+     * @param creationConfig the node creation configuration
+     * @noreference This constructor is not intended to be referenced by clients.
+     */
+    public Node(final NodeFactory<NodeModel> nodeFactory, final ModifiableNodeCreationConfiguration creationConfig) {
         if (nodeFactory == null) {
             throw new IllegalArgumentException("NodeFactory must not be null.");
         }
         m_factory = nodeFactory;
-        m_name = m_factory.getNodeName().intern();
-        m_model = m_factory.callCreateNodeModel(context);
+        if (creationConfig == null && m_factory instanceof ConfigurableNodeFactory) {
+            // TODO: optional of nullable ist sinnlos wir wissen dass es null ist
+            m_creationConfig = ((ConfigurableNodeFactory<NodeModel>)m_factory).createNodeCreationConfig();
+        } else {
+            m_creationConfig = creationConfig;
+        }
+        if (m_creationConfig != null) {
+            m_adaptedNodeDescription = m_factory.getNodeDescription()
+                .createUpdatedNodeDescription(m_creationConfig.getPortConfig().orElse(null));
+        } else {
+            m_adaptedNodeDescription = null;
+        }
+        m_name = m_adaptedNodeDescription != null ? m_adaptedNodeDescription.getNodeName().intern()
+            : m_factory.getNodeName().intern();
+        m_model = m_factory.callCreateNodeModel(m_creationConfig, m_adaptedNodeDescription);
         m_model.addWarningListener(this);
         m_messageListeners = new CopyOnWriteArraySet<NodeMessageListener>();
         // create an extra input port (index: 0) for the optional variables.
         m_inputs = new Input[m_model.getNrInPorts() + 1];
         m_inputs[0] = new Input("Variable Inport", FlowVariablePortObject.TYPE_OPTIONAL);
         for (int i = 1; i < m_inputs.length; i++) {
-            m_inputs[i] = new Input(m_factory.getInportName(i - 1),
-                    m_model.getInPortType(i - 1));
+            m_inputs[i] = new Input(getInportDescriptionName(i), m_model.getInPortType(i - 1));
         }
 
         // create an extra output port (index: 0) for the variables.
@@ -290,7 +315,7 @@ public final class Node implements NodeModelWarningListener {
         for (int i = 1; i < m_outputs.length; i++) {
             m_outputs[i] = new Output();
             m_outputs[i].type = m_model.getOutPortType(i - 1);
-            m_outputs[i].name = m_factory.getOutportName(i - 1);
+            m_outputs[i].name = getOutportDescriptionName(i);
             m_outputs[i].spec = null;
             m_outputs[i].object = null;
             m_outputs[i].summary = null;
@@ -664,19 +689,19 @@ public final class Node implements NodeModelWarningListener {
      * @return The node's type.
      */
     public NodeType getType() {
-        return m_factory.getType();
+        return m_adaptedNodeDescription != null ? m_adaptedNodeDescription.getType() : m_factory.getType();
     }
 
     /**
-     * The XML description can be used with the
-     * <code>NodeFactoryHTMLCreator</code> in order to get a converted HTML
+     * The XML description can be used with the <code>NodeFactoryHTMLCreator</code> in order to get a converted HTML
      * description of it, which fits the overall KNIME HTML style.
      *
      * @return XML description of the node
      * @see org.knime.core.node.NodeFactory#getXMLDescription()
      */
     public Element getXMLDescription() {
-        return m_factory.getXMLDescription();
+        return m_adaptedNodeDescription != null ? m_adaptedNodeDescription.getXMLDescription()
+            : m_factory.getXMLDescription();
     }
 
     /**
@@ -687,6 +712,16 @@ public final class Node implements NodeModelWarningListener {
      */
     public void setName(final String nodeName) {
         m_name = nodeName.intern();
+    }
+
+    /**
+     * Returns a deep copy of the creation configuration of this node.
+     *
+     * @return deep copy of the node creation configuration
+     * @since 4.1
+     */
+    public Optional<ModifiableNodeCreationConfiguration> getCopyOfCreationConfig() {
+        return Optional.ofNullable(m_creationConfig).map(ModifiableNodeCreationConfiguration::copy);
     }
 
     /**
@@ -715,8 +750,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Return the name of the port as specified by the node factory (which
-     * takes it from the node description).
+     * Return the name of the port as specified by the node factory (which takes it from the node description).
+     *
      * @param index the port index
      * @return the name of the port as specified by the node factory.
      */
@@ -724,7 +759,8 @@ public final class Node implements NodeModelWarningListener {
         if (index <= 0) {
             return "Variable Inport";
         }
-        return m_factory.getInportName(index - 1);
+        return m_adaptedNodeDescription != null ? m_adaptedNodeDescription.getInportName(index - 1)
+            : m_factory.getInportName(index - 1);
     }
 
     /**
@@ -750,8 +786,8 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
-     * Return the name of the port as specified by the node factory (which
-     * takes it from the node description).
+     * Return the name of the port as specified by the node factory (which takes it from the node description).
+     *
      * @param index the port index
      * @return the name of the port as specified by the node factory.
      */
@@ -759,7 +795,8 @@ public final class Node implements NodeModelWarningListener {
         if (index <= 0) {
             return "Variable Outport";
         }
-        return m_factory.getOutportName(index - 1);
+        return m_adaptedNodeDescription != null ? m_adaptedNodeDescription.getOutportName(index - 1)
+            : m_factory.getOutportName(index - 1);
     }
 
     /**
@@ -1082,7 +1119,14 @@ public final class Node implements NodeModelWarningListener {
             return false;
         }
 
-        assignInternalHeldObjects(rawInData, exEnv, exec, newOutData);
+        /* #assignInternalHeldObjects does some clean-up for previous internal tables in a loop. if the branch
+         * containing the loop is set to inactive, #cleanOutPorts is invoked via WorkflowManager#resetNodeAndSuccessors.
+         * This entails that the internal tables are cleared. Consequently, there is no need to do further clean-up in
+         * #assignInternalHeldObjects if the node has been set to inactive before. We are therefore OK with not calling
+         * #assignInternalHeldObjects when this node is inactive. */
+        if (!isInactive) {
+            assignInternalHeldObjects(rawInData, exEnv, exec, newOutData);
+        }
         return true;
     } // execute
 
@@ -1696,9 +1740,6 @@ public final class Node implements NodeModelWarningListener {
      * Deletes any temporary resources associated with this node.
      */
     public void cleanup() {
-        LOGGER.assertLog(NodeContext.getContext() != null,
-            "No node context available, please check call hierarchy and fix it");
-
         m_model.unregisterAllViews();
         try {
             m_model.onDispose();
@@ -1941,9 +1982,9 @@ public final class Node implements NodeModelWarningListener {
      * @since 2.8
      */
     public String getInteractiveViewName() {
-        return hasInteractiveView() || hasWizardView()
-            ? StringUtils.defaultIfEmpty(m_factory.getInteractiveViewName(), "MISSING VIEW NAME IN NODE DESCRIPTION")
-            : null;
+        return hasInteractiveView() || hasWizardView() ? StringUtils.defaultIfEmpty(m_adaptedNodeDescription != null
+            ? m_adaptedNodeDescription.getInteractiveViewName() : m_factory.getInteractiveViewName(),
+            "MISSING VIEW NAME IN NODE DESCRIPTION") : null;
     }
 
     /**
@@ -2118,7 +2159,7 @@ public final class Node implements NodeModelWarningListener {
     public NodeDialogPane getDialogPane() {
         if (m_dialogPane == null) {
             if (hasDialog()) {
-                m_dialogPane = createDialogPane(getFactory(), getNrOutPorts(), true);
+                m_dialogPane = createDialogPane(getFactory(), getNrOutPorts(), true, m_creationConfig);
             } else {
                 throw new IllegalStateException("Can't return dialog pane, node has no dialog!");
             }
@@ -2139,14 +2180,37 @@ public final class Node implements NodeModelWarningListener {
      */
     public static NodeDialogPane createDialogPane(final NodeFactory<NodeModel> factory, final int nrOutPorts,
         final boolean addJobMgrTab) {
-        AtomicReference<NodeDialogPane> dialogPane = new AtomicReference<>();
+        return createDialogPane(factory, nrOutPorts, addJobMgrTab, null);
+    }
+
+    /**
+     * Helper method to create a node dialog pane from a {@link NodeFactory} instance.
+     *
+     * @param factory the factory instance to create the node dialog pane from
+     * @param nrOutPorts the number of output ports (mainly used to determine whether to add a misc tab)
+     * @param addJobMgrTab whether the job manager tab should be added
+     * @param creationConfig the node creation configuration
+     *
+     * @return Reference to dialog pane.
+     * @throws IllegalStateException If node has no dialog.
+     * @since 4.1
+     */
+    public static NodeDialogPane createDialogPane(final NodeFactory<NodeModel> factory, final int nrOutPorts,
+        final boolean addJobMgrTab, final NodeCreationConfiguration creationConfig) {
+        AtomicReference<NodeDialogPane> dialogPaneRef = new AtomicReference<>();
         if (factory.hasDialog()) {
             final AtomicReference<Throwable> exRef = new AtomicReference<Throwable>();
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        dialogPane.set(factory.createNodeDialogPane());
+                        final NodeDialogPane dialogPane;
+                        if (creationConfig != null) {
+                            dialogPane = factory.createNodeDialogPane(creationConfig);
+                        } else {
+                            dialogPane = factory.createNodeDialogPane();
+                        }
+                        dialogPaneRef.set(dialogPane);
                     } catch (Throwable ex) {
                         exRef.set(ex);
                     }
@@ -2165,17 +2229,17 @@ public final class Node implements NodeModelWarningListener {
                 // not possible since createNodeDialogPane does not throw Exceptions
             }
         } else {
-            dialogPane.set(new EmptyNodeDialogPane());
+            dialogPaneRef.set(new EmptyNodeDialogPane());
         }
         if (nrOutPorts > 0) {
-            dialogPane.get().addMiscTab();
+            dialogPaneRef.get().addMiscTab();
         }
         if (addJobMgrTab && NodeExecutionJobManagerPool.getNumberOfJobManagersFactories() > 1) {
             // TODO: set the splittype depending on the nodemodel
             SplitType splitType = SplitType.USER;
-            dialogPane.get().addJobMgrTab(splitType);
+            dialogPaneRef.get().addJobMgrTab(splitType);
         }
-        return dialogPane.get();
+        return dialogPaneRef.get();
     }
 
     /**
@@ -2580,12 +2644,37 @@ public final class Node implements NodeModelWarningListener {
     }
 
     /**
+     * Make model aware of corresponding scope start node of given type.
+     *
+     * @param head the node, can be <code>null</code> to 'un-set' the start node
+     * @since 4.2
+     */
+    public void setScopeStartNode(final Node head) {
+        if (head == null) {
+            m_model.setScopeStartNode(null);
+        } else {
+            m_model.setScopeStartNode((ScopeStartNode<?>)head.m_model);
+        }
+    }
+
+    /**
      * @see NodeModel#getLoopStartNode()
      * @return corresponding loop start node.
      * @since 2.6
      */
     public LoopStartNode getLoopStartNode() {
         return m_model.getLoopStartNode();
+    }
+
+    /**
+     * @see NodeModel#getScopeStartNode(Class)
+     * @param startNodeType the type of the scope start node
+     * @return corresponding scope start node or an empty optional if the type doesn't match, this node is not a scope
+     *         end or the user didn't close the scope correctly
+     * @since 4.2
+     */
+    public <T extends ScopeStartNode<?>> Optional<T> getScopeStartNode(final Class<T> startNodeType) {
+        return m_model.getScopeStartNode(startNodeType);
     }
 
     /**

@@ -243,6 +243,12 @@ public final class PortUtil {
         throws IOException, CanceledExecutionException {
         try (ZipInputStream in = new ZipInputStream(new BufferedInputStream(input))) {
             ZipEntry entry = in.getNextEntry();
+
+            // Check that the given input stream really specifies a port object
+            if(entry == null) {
+                throw new IOException("File does not specify a valid port object model");
+            }
+
             if (!"content.xml".equals(entry.getName())) {
                 throw new IOException(
                     "Invalid stream, expected zip entry \"content.xml\", got \"" + entry.getName() + "\"");

@@ -71,6 +71,7 @@ import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeFactory;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.NodeSettings;
+import org.knime.core.node.exec.dataexchange.PortObjectIDSettings;
 import org.knime.core.node.exec.dataexchange.PortObjectRepository;
 import org.knime.core.node.exec.dataexchange.in.BDTInNodeFactory;
 import org.knime.core.node.exec.dataexchange.in.PortObjectInNodeFactory;
@@ -116,9 +117,12 @@ public final class SandboxedNodeCreator {
 
     private static final NodeLogger LOGGER = NodeLogger.getLogger(SandboxedNodeCreator.class);
 
-    private static final NodeFactory<?> OBJECT_READ_NODE_FACTORY = new PortObjectInNodeFactory();
+    // TODO we might decide to make this private again when implementing AP-13335
+    /** {@link PortObjectInNodeFactory} instance. */
+    public static final NodeFactory<?> OBJECT_READ_NODE_FACTORY = new PortObjectInNodeFactory();
 
-    private static final NodeFactory<?> TABLE_READ_NODE_FACTORY = new BDTInNodeFactory();
+    /** {@link BDTInNodeFactory} instance. */
+    public static final NodeFactory<?> TABLE_READ_NODE_FACTORY = new BDTInNodeFactory();
 
     private final WorkflowManager m_rootWFM;
     private final NodeContainer m_nc;
@@ -255,15 +259,18 @@ public final class SandboxedNodeCreator {
                         "No data at port %d, although port is mandatory (port type %s)", i, portType.getName());
                     continue;
                 }
+                List<FlowVariable> flowVars = getFlowVariablesOnPort(i);
                 int portObjectRepositoryID = PortObjectRepository.add(in);
+                PortObjectIDSettings settings = new PortObjectIDSettings();
+                settings.setId(portObjectRepositoryID);
+                settings.setCopyData(m_copyDataIntoNewContext);
+                settings.setFlowVariables(flowVars);
                 portObjectRepositoryIDs.add(portObjectRepositoryID);
                 boolean isTable = BufferedDataTable.TYPE.equals(portType);
                 NodeID inID = tempWFM.createAndAddNode(isTable ? TABLE_READ_NODE_FACTORY : OBJECT_READ_NODE_FACTORY);
                 NodeSettings s = new NodeSettings("temp_data_in");
                 tempWFM.saveNodeSettings(inID, s);
-                List<FlowVariable> flowVars = getFlowVariablesOnPort(i);
-                PortObjectInNodeModel.setInputNodeSettings(s,
-                    portObjectRepositoryID, flowVars, m_copyDataIntoNewContext);
+                PortObjectInNodeModel.setInputNodeSettings(s, settings);
 
                 //update credentials store of the workflow
                 flowVars.stream()

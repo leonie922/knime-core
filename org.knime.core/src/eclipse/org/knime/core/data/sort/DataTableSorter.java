@@ -53,6 +53,8 @@ import java.util.Comparator;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTable;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.RowIterator;
+import org.knime.core.data.container.CloseableTable;
 import org.knime.core.data.container.ContainerTable;
 import org.knime.core.data.container.DataContainer;
 import org.knime.core.node.CanceledExecutionException;
@@ -203,14 +205,34 @@ public class DataTableSorter extends AbstractTableSorter {
         super(rowCount, dataTableSpec, rowComparator);
     }
 
-    /** Sorts the table passed in the constructor according to the settings
-     * and returns the sorted output table.
+    /**
+     * Sorts the table passed in the constructor according to the settings and returns the sorted output table.
+     *
      * @param exec To report progress.
      * @return The sorted output.
-     * @throws CanceledExecutionException If canceled. */
-    public DataTable sort(final ExecutionMonitor exec)
-        throws CanceledExecutionException {
-        return super.sortInternal(exec);
+     * @throws CanceledExecutionException If canceled.
+     * @since 4.2
+     */
+    public CloseableTable sort(final ExecutionMonitor exec) throws CanceledExecutionException {
+        DataTable delegate = super.sortInternal(exec);
+        return new CloseableTable() {
+            @Override
+            public void close() {
+                if (delegate != getInputTable() && delegate instanceof ContainerTable) {
+                    ((ContainerTable)delegate).clear();
+                }
+            }
+
+            @Override
+            public RowIterator iterator() {
+                return delegate.iterator();
+            }
+
+            @Override
+            public DataTableSpec getDataTableSpec() {
+                return delegate.getDataTableSpec();
+            }
+        };
     }
 
     /** {@inheritDoc} */

@@ -46,24 +46,19 @@ package org.knime.core.node.workflow;
 
 /**
  * Exception that is thrown when a loop is constructed illegally.
- * 
+ *
  * @author Bernd Wiswedel, University of Konstanz
  */
-class IllegalLoopException extends Exception {
+class IllegalLoopException extends IllegalScopeException {
 
-    /** @see RuntimeException#RuntimeException(String) */
-    public IllegalLoopException(final String message) {
+    private static final long serialVersionUID = 1L;
+
+    IllegalLoopException(final String message) {
         super(message);
     }
 
-	/**
-	 * @param message
-	 * @param cause
-	 */
-	public IllegalLoopException(String message, Throwable cause) {
+	IllegalLoopException(final String message, final Throwable cause) {
 		super(message, cause);
 	}
-    
-    
 
 }

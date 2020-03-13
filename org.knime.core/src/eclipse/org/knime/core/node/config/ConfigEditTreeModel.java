@@ -140,21 +140,25 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
 
     private static final String VERSION_KEY = "version";
 
+    private static final String TREE_KEY = "tree";
+
     private final CopyOnWriteArrayList<ConfigEditTreeEventListener> m_listeners;
 
     /** Factory method that parses the settings tree and constructs a new
      * object of this class. It will use the mask as given by the second
      * argument (which may be null, however).
      * @param settingsTree The original settings object.
-     * @param variableTree The variables mask.
+     * @param variablesMask The variables mask.
      * @return a new object of this class.
      * @throws InvalidSettingsException If setting can't be parsed
      * @noreference This method is not intended to be referenced by clients.
      */
     public static ConfigEditTreeModel create(final ConfigBase settingsTree,
-            final ConfigBaseRO variableTree) throws InvalidSettingsException {
+            final ConfigBaseRO variablesMask) throws InvalidSettingsException {
         // if we don't find the version number in the variable tree, we're reading a variable tree exported in version 1
-    	final Version version = Version.valueOf(variableTree.getString(VERSION_KEY, Version.V_2008_04_08.name()));
+        final Version version = Version.valueOf(variablesMask.getString(VERSION_KEY, Version.V_2008_04_08.name()));
+        final ConfigBaseRO variableTree = version.equals(Version.V_2008_04_08) || !variablesMask.containsKey(TREE_KEY)
+            ? variablesMask : variablesMask.getConfigBase(TREE_KEY);
         final ConfigEditTreeNode rootNode = new ConfigEditTreeNode(settingsTree, null, version);
         recursiveAdd(rootNode, settingsTree, variableTree);
         final ConfigEditTreeModel result = new ConfigEditTreeModel(rootNode);
@@ -387,24 +391,34 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
         m_listeners.remove(listener);
     }
 
-    /** Fire an event.
+    /**
+     * Fire an event.
+     *
      * @param treePath The tree path that has changed.
      * @param useVariable The new variable, which overwrites the user settings.
      * @param exposeVariableName The variable name to expose.
      */
-    void fireConfigEditTreeEvent(final String[] treePath,
-            final String useVariable, final String exposeVariableName) {
-        ConfigEditTreeEvent event = new ConfigEditTreeEvent(
-                this, treePath, useVariable, exposeVariableName);
-        for (ConfigEditTreeEventListener l : m_listeners) {
-            l.configEditTreeChanged(event);
+    void fireConfigEditTreeEvent(final String[] treePath, final String useVariable, final String exposeVariableName) {
+        final ConfigEditTreeEvent event = new ConfigEditTreeEvent(this, treePath, useVariable, exposeVariableName);
+        m_listeners.stream().forEach(l -> l.configEditTreeChanged(event));
+    }
+
+    /**
+     * This triggers all children paths to be redrawn.
+     *
+     * @param tree the owning {@link ConfigEditJTree} instance
+     */
+    void forceModelRefresh(final ConfigEditJTree tree) {
+        final int[] childIndices = new int[getRoot().getChildCount()];
+        for (int i = 1; i < childIndices.length; i++) {
+            childIndices[i] = i;
         }
+        fireTreeNodesChanged(tree, null, childIndices, null);
     }
 
     /** Single Tree node implementation. */
-    public static final class ConfigEditTreeNode
-        extends DefaultMutableTreeNode {
-
+    @SuppressWarnings("serial")
+    public static final class ConfigEditTreeNode extends DefaultMutableTreeNode {
         private final ConfigEntries m_arraySubType;
 
         private final Version m_version;
@@ -605,8 +619,12 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
                 String key = getConfigEntry().getKey();
                 subConfig = variableTree.addConfigBase(key);
             } else {
-                subConfig = variableTree;
-                subConfig.addString(VERSION_KEY, m_version.name());
+                if (m_version.equals(Version.V_2008_04_08)) {
+                    subConfig = variableTree;
+                } else {
+                    variableTree.addString(VERSION_KEY, m_version.name());
+                    subConfig = variableTree.addConfigBase(TREE_KEY);
+                }
             }
             if (getUserObject().isLeaf()) {
                 subConfig.addString(CFG_USED_VALUE, getUseVariableName());
@@ -955,6 +973,8 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
             final VariableType<?> type = v.getVariableType();
             if (type.equals(BooleanArrayType.INSTANCE)) {
                 return ArrayUtils.toPrimitive(v.getValue(BooleanArrayType.INSTANCE));
+            } else if (type.equals(BooleanType.INSTANCE)) {
+                return new boolean[]{v.getValue(BooleanType.INSTANCE)};
             } else {
                 throw new InvalidSettingsException("Can't evaluate variable \"" + varString
                     + "\" as boolean array expression, it is a " + type + " (\"" + v + "\")");
@@ -990,6 +1010,12 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
             } else if (type.equals(IntArrayType.INSTANCE)) {
                 return Arrays.stream(v.getValue(IntArrayType.INSTANCE)).mapToDouble(Integer::doubleValue)
                     .toArray();
+            } else if (type.equals(DoubleType.INSTANCE)) {
+                return new double[]{v.getDoubleValue()};
+            } else if (type.equals(LongType.INSTANCE)) {
+                return new double[]{v.getValue(LongType.INSTANCE)};
+            } else if (type.equals(IntType.INSTANCE)) {
+                return new double[]{v.getIntValue()};
             } else {
                 throw new InvalidSettingsException("Can't evaluate variable \"" + varString
                     + "\" as double array expression, it is a " + type + " (\"" + v + "\")");
@@ -1020,6 +1046,10 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
             } else if (type.equals(IntArrayType.INSTANCE)) {
                 return Arrays.stream(v.getValue(IntArrayType.INSTANCE)).mapToLong(Integer::longValue)
                     .toArray();
+            } else if (type.equals(LongType.INSTANCE)) {
+                return new long[]{v.getValue(LongType.INSTANCE)};
+            } else if (type.equals(IntType.INSTANCE)) {
+                return new long[]{v.getIntValue()};
             } else {
                 throw new InvalidSettingsException("Can't evaluate variable \"" + varString
                     + "\" as long array expression, it is a " + type + " (\"" + v + "\")");
@@ -1045,6 +1075,8 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
             final VariableType<?> type = v.getVariableType();
             if (type.equals(IntArrayType.INSTANCE)) {
                 return ArrayUtils.toPrimitive(v.getValue(IntArrayType.INSTANCE));
+            } else if (type.equals(IntType.INSTANCE)) {
+                return new int[]{v.getIntValue()};
             } else {
                 throw new InvalidSettingsException("Can't evaluate variable \"" + varString
                     + "\" as integer array expression, it is a " + type + " (\"" + v + "\")");
@@ -1083,6 +1115,10 @@ public final class ConfigEditTreeModel extends DefaultTreeModel {
             } else if (type.equals(IntArrayType.INSTANCE)) {
                 return Arrays.stream(v.getValue(IntArrayType.INSTANCE)).map(l -> Integer.toString(l))
                     .toArray(String[]::new);
+            } else if (type.equals(StringType.INSTANCE) || type.equals(BooleanType.INSTANCE)
+                || type.equals(IntType.INSTANCE) || type.equals(LongType.INSTANCE)
+                || type.equals(DoubleType.INSTANCE)) {
+                return new String[]{v.getValueAsString()};
             } else {
                 throw new InvalidSettingsException("Can't evaluate variable \"" + varString
                     + "\" as string array expression, it is a " + type + " (\"" + v + "\")");

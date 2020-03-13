@@ -123,7 +123,6 @@ import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.KNIMEConstants;
 import org.knime.core.node.Node;
-import org.knime.core.node.NodeCreationContext;
 import org.knime.core.node.NodeDialogPane;
 import org.knime.core.node.NodeFactory;
 import org.knime.core.node.NodeFactory.NodeType;
@@ -134,6 +133,7 @@ import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.NodeView;
 import org.knime.core.node.NotConfigurableException;
+import org.knime.core.node.context.ModifiableNodeCreationConfiguration;
 import org.knime.core.node.dialog.DialogNode;
 import org.knime.core.node.dialog.DialogNodeValue;
 import org.knime.core.node.dialog.ExternalNodeData;
@@ -178,6 +178,7 @@ import org.knime.core.node.workflow.action.ExpandSubnodeResult;
 import org.knime.core.node.workflow.action.InteractiveWebViewsResult;
 import org.knime.core.node.workflow.action.MetaNodeToSubNodeResult;
 import org.knime.core.node.workflow.action.SubNodeToMetaNodeResult;
+import org.knime.core.node.workflow.capture.WorkflowFragment;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionResult;
 import org.knime.core.node.workflow.execresult.NodeContainerExecutionStatus;
 import org.knime.core.node.workflow.execresult.WorkflowExecutionResult;
@@ -337,6 +338,14 @@ public final class WorkflowManager extends NodeContainer
      */
     public static final WorkflowManager ROOT = new WorkflowManager(null, null, NodeID.ROOTID, new PortType[0],
         new PortType[0], true, null, "ROOT", Optional.empty(), Optional.empty());
+
+    /**
+     * The root of all extracted workflow fragments.
+     *
+     * @since 4.2
+     */
+    public static final WorkflowManager EXTRACTED_WORKFLOW_ROOT =
+        ROOT.createAndAddProject("KNIME captured workflow fragment repository", new WorkflowCreationHelper());
 
     /**
      * The root of all metanodes that are part of the node repository, for instance x-val metanode.
@@ -626,6 +635,28 @@ public final class WorkflowManager extends NodeContainer
         }
     }
 
+    /**
+     * Analogon to {@link #getProjectWFM()} but for project components. Will traverse the hierarchy to find the project
+     * component.
+     *
+     * @return the project component or an empty optional if not (part of) a component project but a workflow project
+     * @since 4.1
+     */
+    public Optional<SubNodeContainer> getProjectComponent() {
+        if (isProject()) {
+            return Optional.empty();
+        } else if (isComponentProjectWFM()) {
+            return Optional.ofNullable((SubNodeContainer)getDirectNCParent());
+        } else {
+            NodeContainerParent directNCParent = getDirectNCParent();
+            if (directNCParent instanceof WorkflowManager) {
+                return ((WorkflowManager)directNCParent).getProjectComponent();
+            } else {
+                return ((WorkflowManager)directNCParent.getDirectNCParent()).getProjectComponent();
+            }
+        }
+    }
+
     //    public WorkflowManager getProjectFor(final NodeContainer nc) {
     //        NodeContainerParent ncParent;
     //        do {
@@ -693,8 +724,14 @@ public final class WorkflowManager extends NodeContainer
                 ((WorkflowManager)nc).shutdown();
                 removeNode(id);
                 LOGGER.debug("Project " + nameAndID + " removed (" + m_workflow.getNrNodes() + " remaining)");
+            } else if (nc instanceof SubNodeContainer) {
+                final String nameAndID = "\"" + nc.getNameWithID() + "\"";
+                LOGGER.debug("Removing component project " + nameAndID);
+                ((SubNodeContainer)nc).getWorkflowManager().shutdown();
+                removeNode(id);
+                LOGGER.debug("Component project " + nameAndID + " removed (" + m_workflow.getNrNodes() + " remaining)");
             } else {
-                throw new IllegalArgumentException("Node: " + id + " is not a project!");
+                throw new IllegalArgumentException("Node: " + id + " is neither a workflow nor component project!");
             }
         }
     }
@@ -707,46 +744,42 @@ public final class WorkflowManager extends NodeContainer
      * @return newly created (unique) NodeID
      */
     public NodeID createAndAddNode(final NodeFactory<?> factory) {
-        return internalAddNewNode(factory, null);
+        return addNodeAndApplyContext(factory, null, -1);
     }
 
     /**
-     * Create new Node based on given factory and add to workflow.
+     * Uses given Factory to create a new node and then adds new node to the workflow manager.
      *
-     * @param factory ...
-     * @return unique ID of the newly created and inserted node.
-     * @since 2.9
-     */
-    public NodeID addNode(final NodeFactory<?> factory) {
-        return addNodeAndApplyContext(factory, null);
-    }
-
-    /**
-     * @param factory ...
-     * @param context the context provided by the framework (e.g. the URL of the file that was dragged on the canvas)
+     * @param factory NodeFactory used to create the new node
+     * @param creationConfig the creation configuration provided by the framework (e.g. the URL of the file that was
+     *            dragged on the canvas) or null
+     * @param nodeIDSuffix unique node ID suffix of the to-be-created node or -1 if a new NodeID should be generated
      * @return the node id of the created node.
+     * @since 4.2
      */
-    public NodeID addNodeAndApplyContext(final NodeFactory<?> factory, final NodeCreationContext context) {
-        return internalAddNewNode(factory, context);
-    }
-
-    @SuppressWarnings("unchecked")
-    private NodeID internalAddNewNode(final NodeFactory<?> factory, final NodeCreationContext context) {
+    public NodeID addNodeAndApplyContext(final NodeFactory<?> factory,
+        final ModifiableNodeCreationConfiguration creationConfig, final int nodeIDSuffix) {
+        CheckUtils.checkArgument(nodeIDSuffix >= -1, "Suffix must be -1 or larger or equal to 0: %d", nodeIDSuffix);
         try (WorkflowLock lock = lock()) {
-            // TODO synchronize to avoid messing with running workflows!
-            assert factory != null;
-            // insert node
-            NodeID newID = m_workflow.createUniqueID();
+            final NodeID id;
+            if (nodeIDSuffix >= 0) {
+                id = getID().createChild(nodeIDSuffix);
+                CheckUtils.checkArgument(!m_workflow.containsNodeKey(id), "ID already in use: %s", id);
+            } else {
+                id = m_workflow.createUniqueID();
+            }
+            @SuppressWarnings("unchecked")
             NativeNodeContainer container =
-                new NativeNodeContainer(this, new Node((NodeFactory<NodeModel>)factory, context), newID);
+                new NativeNodeContainer(this, new Node((NodeFactory<NodeModel>)factory, creationConfig), id);
             addNodeContainer(container, true);
-            configureNodeAndSuccessors(newID, true);
-            if (context != null) { // save node settings if source URL/context was provided (bug 5772)
+            configureNodeAndSuccessors(id, true);
+            // save node settings if source URL/context was provided (bug 5772)
+            if (creationConfig != null && creationConfig.getURLConfig().isPresent()) {
                 container.saveNodeSettingsToDefault();
             }
-            LOGGER.debug("Added new node " + newID);
+            LOGGER.debug("Added new node " + id);
             setDirty();
-            return newID;
+            return id;
         }
     }
 
@@ -894,6 +927,18 @@ public final class WorkflowManager extends NodeContainer
     }
 
     /**
+     * Returns <code>true</code> if the workflow manager has a component (={@link SubNodeContainer}) as direct parent
+     * which is not embedded in a workflow but directly opened as component project.
+     *
+     * @return <code>true</code> if the parent is a component project, i.e. a component (sub node) not embedded in a
+     *         workflow
+     * @since 4.1
+     */
+    public boolean isComponentProjectWFM() {
+        return getDirectNCParent() instanceof SubNodeContainer && ((SubNodeContainer)getDirectNCParent()).isProject();
+    }
+
+   /**
      * Creates new metanode from a persistor instance.
      *
      * @param persistor to read from
@@ -922,11 +967,12 @@ public final class WorkflowManager extends NodeContainer
      */
     private void addNodeContainer(final NodeContainer nodeContainer, final boolean propagateChanges) {
         try (WorkflowLock lock = assertLock()) {
-            if (this == ROOT && !(nodeContainer instanceof WorkflowManager)) {
+            if (this == ROOT && nodeContainer instanceof NativeNodeContainer) {
                 throw new IllegalStateException(
-                    "Can't add ordinary node to root " + "workflow, use createAndAddProject() first");
+                    "Can't add native node to root " + "workflow, use createAndAddProject() first");
             }
-            if (this == ROOT && (nodeContainer.getNrInPorts() != 0 || nodeContainer.getNrOutPorts() != 0)) {
+            if (this == ROOT && (nodeContainer.getNrInPorts() != 0 || nodeContainer.getNrOutPorts() != 0)
+                && !(nodeContainer instanceof SubNodeContainer)) {
                 throw new IllegalStateException(
                     "Can't add sub workflow to root " + " workflow, use createProject() instead");
             }
@@ -1769,6 +1815,7 @@ public final class WorkflowManager extends NodeContainer
                     ((WorkflowManager)nc).reconfigureAllNodesOnlyInThisWFM(false);
                     configureNodeAndSuccessors(id, false);
                 }
+                notifyWorkflowListeners(new WorkflowEvent(WorkflowEvent.Type.NODE_SETTINGS_CHANGED, id, null, null));
             } else {
                 throw new IllegalStateException(
                     "Cannot load settings into node; it is executing or has executing successors");
@@ -2930,13 +2977,13 @@ public final class WorkflowManager extends NodeContainer
             nc.getNodeTimer().startExec();
             if (nc instanceof SingleNodeContainer) {
                 FlowObjectStack flowObjectStack = nc.getFlowObjectStack();
-                FlowLoopContext slc = flowObjectStack.peek(FlowLoopContext.class);
+                FlowScopeContext fsc = flowObjectStack.peek(FlowScopeContext.class);
 
                 // if the node is in a subnode the subnode may be part of restored loop, see AP-7585
                 FlowLoopContext subnodeOuterFlowLoopContext = flowObjectStack
                     .peekOptional(FlowSubnodeScopeContext.class).map(s -> s.getOuterFlowLoopContext()).orElse(null);
 
-                if (slc instanceof RestoredFlowLoopContext
+                if (fsc instanceof RestoredFlowLoopContext
                     || subnodeOuterFlowLoopContext instanceof RestoredFlowLoopContext) {
                     throw new IllegalFlowObjectStackException(
                         "Can't continue loop as the workflow was restored with the loop being partially "
@@ -2944,27 +2991,52 @@ public final class WorkflowManager extends NodeContainer
                 }
                 if (nc instanceof NativeNodeContainer) {
                     NativeNodeContainer nnc = (NativeNodeContainer)nc;
-                    if (nnc.isModelCompatibleTo(LoopEndNode.class)) {
-                        // if this is an END to a loop, make sure it knows its head
-                        if (slc == null) {
+                    if (nnc.isModelCompatibleTo(ScopeEndNode.class)) {
+                        // if this is an END to a loop/scope, make sure it knows its head
+                        if (fsc == null) {
                             LOGGER.debug("Incoming flow object stack for " + nnc.getNameWithID() + ":\n"
                                 + flowObjectStack.toDeepString());
-                            throw new IllegalFlowObjectStackException(
-                                "Encountered loop-end without corresponding head!");
+                            if (nnc.isModelCompatibleTo(LoopEndNode.class)) {
+                                throw new IllegalFlowObjectStackException(
+                                    "Encountered loop-end without corresponding head!");
+                            } else {
+                                throw new IllegalFlowObjectStackException(
+                                    "Encountered scope-end without corresponding head!");
+                            }
                         }
-                        NodeContainer headNode = m_workflow.getNode(slc.getOwner());
+                        NodeContainer headNode = m_workflow.getNode(fsc.getOwner());
                         if (headNode == null) {
-                            throw new IllegalFlowObjectStackException(
-                                "Loop start and end nodes are not in the" + " same workflow");
+                            if (nnc.isModelCompatibleTo(LoopEndNode.class)) {
+                                throw new IllegalFlowObjectStackException(
+                                    "Loop start and end nodes are not in the" + " same workflow");
+                            } else {
+                                throw new IllegalFlowObjectStackException(
+                                    "Scope start and end nodes are not in the" + " same workflow");
+                            }
+                        } else if (headNode instanceof NativeNodeContainer
+                            && ((NativeNodeContainer)headNode)
+                                .isModelCompatibleTo(ScopeStartNode.class)) {
+                            //check that the start and end nodes have compatible flow scope contexts
+                            Class<? extends FlowScopeContext> endNodeFlowScopeContext =
+                                ((ScopeEndNode<?>)nnc.getNodeModel()).getFlowScopeContextClass();
+                            if (!endNodeFlowScopeContext.isAssignableFrom(fsc.getClass())) {
+                                if (nnc.isModelCompatibleTo(LoopEndNode.class)) {
+                                    throw new IllegalFlowObjectStackException(
+                                        "Encountered loop-end without compatible head!");
+                                } else {
+                                    throw new IllegalFlowObjectStackException(
+                                        "Encountered scope-end without compatible head!");
+                                }
+                            }
                         }
                         assert ((NativeNodeContainer)headNode).getNode().getNodeModel()
-                            .equals(nnc.getNode().getLoopStartNode());
+                            .equals(nnc.getNode().getScopeStartNode(ScopeStartNode.class).orElse(null));
                     } else if (nnc.isModelCompatibleTo(LoopStartNode.class)) {
                         nnc.getNode().getOutgoingFlowObjectStack().push(new InnerFlowLoopContext());
                         //                    nnc.getNode().getFlowObjectStack().push(new InnerFlowLoopContext());
                     } else {
                         // or not if it's any other type of node
-                        nnc.getNode().setLoopStartNode(null);
+                        nnc.getNode().setScopeStartNode(null);
                     }
                 }
 
@@ -3117,9 +3189,10 @@ public final class WorkflowManager extends NodeContainer
             }
             // note this is NOT the else of the if above - success can be modified...
             if (!success && nc instanceof SingleNodeContainer) {
-                // clean up node interna and status (but keep org. message!)
                 // switch from IDLE to CONFIGURED if possible!
+                // keeps node messages, also for nodes within a component/subnode
                 configureSingleNodeContainer((SingleNodeContainer)nc, /*keepNodeMessage=*/true);
+                // in case there is a more recent message from above
                 nc.setNodeMessage(latestNodeMessage);
             }
             // now handle non success for all types of nodes:
@@ -3408,6 +3481,23 @@ public final class WorkflowManager extends NodeContainer
             }
         }
         return exposedInports;
+    }
+
+    /**
+     * Creates an operation that allows one to capture parts of a workflow that is encapsulated by
+     * {@link CaptureWorkflowStartNode} and {@link CaptureWorkflowEndNode}s.
+     *
+     * @param endNodeID the node id that must represent a {@link CaptureWorkflowEndNode}
+     *
+     * @return a {@link WorkflowFragment} that represents the captured part
+     * @throws IllegalScopeException
+     * @throws IllegalArgumentException if the given node id doesn't represent a 'capture workflow end node' or the
+     *             respective 'capture workflow start node' is missing
+     * @since 4.2
+     */
+    public WorkflowCaptureOperation createCaptureOperationFor(final NodeID endNodeID)
+        throws IllegalScopeException {
+        return new WorkflowCaptureOperation(endNodeID, this);
     }
 
     /*
@@ -4528,8 +4618,8 @@ public final class WorkflowManager extends NodeContainer
         if (snc.isModelCompatibleTo(LoopStartNode.class)) {
             ((NativeNodeContainer)snc).getNode().setLoopEndNode(null);
         }
-        if (snc.isModelCompatibleTo(LoopEndNode.class)) {
-            ((NativeNodeContainer)snc).getNode().setLoopStartNode(null);
+        if (snc.isModelCompatibleTo(ScopeEndNode.class)) {
+            ((NativeNodeContainer)snc).getNode().setScopeStartNode(null);
         }
     }
 
@@ -5011,12 +5101,16 @@ public final class WorkflowManager extends NodeContainer
      */
     private boolean hasExecutableNode() {
         for (NodeContainer nc : m_workflow.getNodeValues()) {
-            if (nc instanceof SingleNodeContainer) {
-                if (nc.getInternalState().equals(CONFIGURED)) {
+            if (nc instanceof SubNodeContainer) {
+                if (((SubNodeContainer)nc).getWorkflowManager().hasExecutableNode()) {
                     return true;
                 }
-            } else {
+            } else if (nc instanceof WorkflowManager) {
                 if (((WorkflowManager)nc).hasExecutableNode()) {
+                    return true;
+                }
+            } else { // NativeNodeContainer
+                if (nc.getInternalState().equals(CONFIGURED)) {
                     return true;
                 }
             }
@@ -5719,6 +5813,9 @@ public final class WorkflowManager extends NodeContainer
             NodeOutPort[] predOutPorts = assemblePredecessorOutPorts(id);
             for (int i = 0; i < predOutPorts.length; i++) {
                 NodeOutPort p = predOutPorts[i];
+                while (p instanceof NodeOutPortWrapper) {
+                    p = ((NodeOutPortWrapper)p).getUnderlyingPort();
+                }
                 if (p == null) { // unconnected port
                     // accept only if inport is optional
                     if (!nc.getInPort(i).getPortType().isOptional()) {
@@ -5817,8 +5914,13 @@ public final class WorkflowManager extends NodeContainer
                 return false;
             }
             if (!canConfigureNodes()) {
-                snc.setNodeMessage(NodeMessage.merge(oldMessage,
-                    NodeMessage.newWarning("Outer workflow does not have input data, execute it first")));
+                String message;
+                if (snc.getParent().isComponentProjectWFM()) {
+                    message = "No example input data stored with component";
+                } else {
+                    message = "Component does not have input data, execute upstream nodes first";
+                }
+                snc.setNodeMessage(NodeMessage.merge(oldMessage, NodeMessage.newWarning(message)));
                 return false;
             }
 
@@ -5884,25 +5986,30 @@ public final class WorkflowManager extends NodeContainer
                     flowStackConflict = true;
                 }
                 snc.setCredentialsStore(m_credentialsStore);
-                // update backwards reference for loops
-                if (snc.isModelCompatibleTo(LoopEndNode.class)) {
-                    // if this is an END to a loop, make sure it knows its head
-                    // (for both: active and inactive loops)
+                // update backwards reference for scopes (e.g. loops)
+                if (snc.isModelCompatibleTo(ScopeEndNode.class)) {
+                    // if this is an END to a scope (e.g. loop), make sure it knows its head
+                    // (for both: active and inactive loops/scopes)
                     Node sncNode = ((NativeNodeContainer)snc).getNode();
-                    FlowLoopContext slc = scsc.peek(FlowLoopContext.class);
-                    if (slc == null) {
+                    FlowScopeContext fsc = scsc.peek(FlowScopeContext.class);
+                    if (fsc == null) {
                         // no head found - ignore during configure!
-                        sncNode.setLoopStartNode(null);
+                        sncNode.setScopeStartNode(null);
                     } else {
-                        // loop seems to be correctly wired - set head
-                        NodeContainer headNode = m_workflow.getNode(slc.getOwner());
+                        // scope/loop seems to be correctly wired - set head
+                        NodeContainer headNode = m_workflow.getNode(fsc.getOwner());
                         if (headNode == null) {
                             // odd: head is not in the same workflow,
                             // ignore as well during configure
-                            sncNode.setLoopStartNode(null);
+                            sncNode.setScopeStartNode(null);
                         } else {
-                            // head found, let the end node know about it:
-                            sncNode.setLoopStartNode(((NativeNodeContainer)headNode).getNode());
+                            // head found, let the end node know about it
+                            // but only if the start and end nodes have a compatible flow scope context
+                            Class<? extends FlowScopeContext> flowScopeContextClass =
+                                ((ScopeEndNode<?>)sncNode.getNodeModel()).getFlowScopeContextClass();
+                            if (flowScopeContextClass.isAssignableFrom(fsc.getClass())) {
+                                sncNode.setScopeStartNode(((NativeNodeContainer)headNode).getNode());
+                            }
                         }
                     }
                 }
@@ -6247,41 +6354,118 @@ public final class WorkflowManager extends NodeContainer
     }
 
     /**
-     * Prints a list of errors that occurred in this node and all subnodes
-     *
-     * @param indent number of leading spaces
-     * @return String of errors with their node ids
-     * @since 4.0
+     * Attempts to extract the useful errors by identifying the errors in the workflow. Some smart filtering is applied:
+     * <ul>
+     * <li>Unconnected inputs are more important than errors</li>
+     * <li>Show only messages that are 'left' in the workflow (in a breadth-first search ordering)</li>
+     * <li>No duplicated error messages</li>
+     * <li>At most three messages</li>
+     * </ul>
+     * @return String of errors
+     * @see #getNodeWarningSummary()
+     * @since 4.1
      */
-    String printNodeErrorSummary(final int indent) {
-        char[] indentChars = new char[indent];
-        Arrays.fill(indentChars, ' ');
-        String indentString = new String(indentChars);
-        StringBuilder build = new StringBuilder(indentString);
+    Optional<String> getNodeErrorSummary() {
         try (WorkflowLock lock = lock()) {
-            for (NodeID id : m_workflow.getNodeIDs()) {
+            Map<NodeContainer, String> erroredNodes = new LinkedHashMap<>();
+            Set<NodeContainer> notFullyConnectedNodes = new LinkedHashSet<>();
+
+            Set<NodeID> downstreamNodesOfErroredNodes = new HashSet<>(); // these will be skipped
+
+            // traverse breadth first and a node with errors will suppress errors on their downstream nodes
+            Collection<NodeID> nodes = m_workflow.createBreadthFirstSortedList(m_workflow.getNodeIDs(), true).keySet();
+            for (NodeID id : nodes) {
                 NodeContainer nc = m_workflow.getNode(id);
-                if (nc instanceof WorkflowManager) {
-                    build.append(((WorkflowManager)nc).printNodeErrorSummary(indent + 2));
-                } else if (nc instanceof SubNodeContainer) {
-                    build.append(((SubNodeContainer)nc).getWorkflowManager().printNodeErrorSummary(indent + 6));
+                final NodeMessage nodeMessage = nc.getNodeMessage();
+                if (downstreamNodesOfErroredNodes.contains(id)) {
+                    // ignore; allowed to fail
+                    continue;
+                }
+                // first: check if not fully connected (NB. WFM may or may not be fully connected)
+                if (!(nc instanceof WorkflowManager) && !isFullyConnected(id)) {
+                    notFullyConnectedNodes.add(nc);
+                    if (!downstreamNodesOfErroredNodes.contains(id)) {
+                        Set<NodeID> successors = m_workflow.getBreadthFirstListOfNodeAndSuccessors(id, false).keySet();
+                        downstreamNodesOfErroredNodes.addAll(successors);
+                    }
                 } else {
-                    final NodeMessage nodeMessage = nc.getNodeMessage();
-                    // Print messages from nodes that have an error message, and warning messages from
-                    // nodes that failed to configure
-                    if (nodeMessage.getMessageType() == Type.ERROR || (!nc.getNodeContainerState().isConfigured()
-                        && nodeMessage.getMessageType() == Type.WARNING)) {
-                        build.append(indentString);
-                        build.append("  ");
-                        build.append(nc.getNameWithID());
-                        build.append(" : ");
-                        build.append(StringUtils.removeStart(nodeMessage.getMessage(), Node.EXECUTE_FAILED_PREFIX));
-                        build.append("\n");
+                    String msg = null;
+                    if (nodeMessage.getMessageType() == Type.ERROR) {
+                        msg = StringUtils.removeStart(nodeMessage.getMessage(), Node.EXECUTE_FAILED_PREFIX);
+                        msg = StringUtils.removeStart(msg, "\n");
+                    } else if (nc instanceof WorkflowManager && !nc.getInternalState().isExecuted()) {
+                        msg = ((WorkflowManager)nc).getNodeErrorSummary().orElse(null);
+                    }
+                    if (msg != null) {
+                        if (!erroredNodes.values().contains(msg)) { // no duplicates of the same message
+                            erroredNodes.put(nc, msg);
+                        }
+                        Set<NodeID> successors = m_workflow.getBreadthFirstListOfNodeAndSuccessors(id, false).keySet();
+                        downstreamNodesOfErroredNodes.addAll(successors);
                     }
                 }
             }
+            StringBuilder errorStringBuilder = new StringBuilder();
+            if (!notFullyConnectedNodes.isEmpty()) {
+                if (notFullyConnectedNodes.size() == 1) {
+                    errorStringBuilder.append("Contains an unconnected node (\"")//
+                        .append(notFullyConnectedNodes.iterator().next().getNameWithID())//
+                        .append("\")");
+                } else {
+                    errorStringBuilder.append("Contains ")//
+                        .append(notFullyConnectedNodes.size()).append(" unconnected nodes");
+                }
+            } else if (!erroredNodes.isEmpty()) {
+                errorStringBuilder.append(erroredNodes.entrySet().stream().limit(3)//
+                    .map(entry -> entry.getKey().getNameWithID() + ": " + entry.getValue())//
+                    .collect(Collectors.joining("\n")));
+            }
+            return errorStringBuilder.length() == 0 ? Optional.empty() : Optional.of(errorStringBuilder.toString());
         }
-        return build.toString();
+    }
+
+    /**
+     * Similar to {@link #getNodeErrorSummary()} but the same logic applied to node warning messages. Used as
+     * 'fallback' when the workflow failed to execute but there are no errors. Nodes having failing during configuration
+     * ("No configuration available") will have no error message but a warning.
+
+     * @return String of warnings, if any.
+     * @since 4.1
+     */
+    Optional<String> getNodeWarningSummary() {
+        try (WorkflowLock lock = lock()) {
+            Map<NodeContainer, String> warnedNodes = new LinkedHashMap<>();
+
+            Set<NodeID> downstreamNodesOfWarnedNodes = new HashSet<>();
+
+            // traverse breadth first and a node with error/warning/etc will suppress errors on downstream nodes
+            Collection<NodeID> nodes = m_workflow.createBreadthFirstSortedList(m_workflow.getNodeIDs(), true).keySet();
+            for (NodeID id : nodes) {
+                if (downstreamNodesOfWarnedNodes.contains(id)) {
+                    continue;
+                }
+                NodeContainer nc = m_workflow.getNode(id);
+                final NodeMessage nodeMessage = nc.getNodeMessage();
+                if (!nc.getNodeContainerState().isConfigured() && nodeMessage.getMessageType() == Type.WARNING) {
+                    String msg = nodeMessage.getMessage();
+                    if (!warnedNodes.values().contains(msg)) { // no duplicates of the same message
+                        warnedNodes.put(nc, msg);
+                    }
+                    // don't skip downstream nodes if node is executed -- the true problem might be downstream...
+                    // say an executed "Row Filter" ("no rows filtered") followed by an unconfigured red node...
+                    if (!nc.getInternalState().isExecuted()) {
+                        Set<NodeID> successors = m_workflow.getBreadthFirstListOfNodeAndSuccessors(id, false).keySet();
+                        downstreamNodesOfWarnedNodes.addAll(successors);
+                    }
+                }
+            }
+            if (!warnedNodes.isEmpty()) {
+                return Optional.of(warnedNodes.entrySet().stream().limit(3)//
+                    .map(entry -> entry.getKey().getNameWithID() + ": " + entry.getValue())//
+                    .collect(Collectors.joining("\n")));
+            }
+            return Optional.empty();
+        }
     }
 
     /** {@inheritDoc} */
@@ -7257,7 +7441,10 @@ public final class WorkflowManager extends NodeContainer
      *
      * @param evt event
      */
-    private final void notifyWorkflowListeners(final WorkflowEvent evt) {
+    final void notifyWorkflowListeners(final WorkflowEvent evt) {
+        if (!evt.getType().equals(WorkflowEvent.Type.WORKFLOW_DIRTY)) {
+            findChangesTracker().ifPresent(ct -> ct.otherChange());
+        }
         if (m_wfmListeners.isEmpty()) {
             return;
         }
@@ -7387,18 +7574,28 @@ public final class WorkflowManager extends NodeContainer
                     nodeIDSuffix = cont.getID().getIndex();
                 }
                 loaderMap.put(nodeIDSuffix, copyPersistor);
+
+                NodeUIInformation uiInfo = copyMetaPersistor.getUIInfo();
+                if (uiInfo != null) {
+                    content.getPositionOffset()//
+                        .map(off -> NodeUIInformation.builder(uiInfo).translate(off).build())//
+                        .ifPresent(ui -> copyMetaPersistor.setUIInfo(ui));
+                }
                 for (ConnectionContainer out : m_workflow.getConnectionsBySource(nodeIDs[i])) {
                     if (idsHashed.contains(out.getDest())) {
                         ConnectionContainerTemplate t = new ConnectionContainerTemplate(out, false);
+                        t.fixPostionOffsetIfPresent(content.getPositionOffset());
                         connTemplates.add(t);
                     } else if (isIncludeInOut) {
                         ConnectionContainerTemplate t = new ConnectionContainerTemplate(out, false);
+                        t.fixPostionOffsetIfPresent(content.getPositionOffset());
                         additionalConnTemplates.add(t);
                     }
                 }
                 if (isIncludeInOut) {
                     for (ConnectionContainer in : m_workflow.getConnectionsByDest(nodeIDs[i])) {
                         ConnectionContainerTemplate t = new ConnectionContainerTemplate(in, false);
+                        t.fixPostionOffsetIfPresent(content.getPositionOffset());
                         additionalConnTemplates.add(t);
                     }
                 }
@@ -7863,8 +8060,8 @@ public final class WorkflowManager extends NodeContainer
                 }
                 inStack = new FlowObjectStack(cont.getID(), predStacks);
             } catch (IllegalFlowObjectStackException ex) {
-                subResult.addError("Errors creating flow object stack for " + "node \"" + cont.getNameWithID()
-                    + "\", (resetting " + "flow variables): " + ex.getMessage());
+                subResult.addError("Errors creating flow object stack for node \"" + cont.getNameWithID()
+                    + "\", (resetting flow variables): " + ex.getMessage());
                 needsReset = true;
                 inStack = new FlowObjectStack(cont.getID());
             }
@@ -7942,7 +8139,7 @@ public final class WorkflowManager extends NodeContainer
                         subResult.addError(warning, true);
                         break;
                     default:
-                        subResult.addWarning(warning);
+                        subResult.addNodeStateChangedWarning(warning);
                 }
                 cont.setDirty();
             }

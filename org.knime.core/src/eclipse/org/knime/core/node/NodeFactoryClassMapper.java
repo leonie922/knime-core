@@ -55,10 +55,23 @@ import org.eclipse.core.runtime.IExtensionPoint;
 import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.Platform;
 
-/** Base class for {@value #EXT_POINT_ID} extension point to allow node vendors to define a {@link NodeFactory} class
+/**
+ * Base class for {@value #EXT_POINT_ID} extension point to allow node vendors to define a {@link NodeFactory} class
  * mapping. Used when a persisted workflow is referencing an outdated (and refactored) node implementation.
  *
- * <p>Further details are in the corresponding extension point definition.
+ * <p>
+ * Further details are in the corresponding extension point definition.
+ * </p>
+ *
+ * <p>
+ * If this class is extended directly the node mappings will not be exposed, which means it may not be possible to
+ * replicate their behavior in other platforms. Instead extend {@link MapNodeFactoryClassMapper} or
+ * {@link RegexNodeFactoryClassMapper} which do expose the mappings.
+ * </p>
+ *
+ * @noreference This class is not intended to be referenced by clients.
+ * @see MapNodeFactoryClassMapper
+ * @see RegexNodeFactoryClassMapper
  * @author Bernd Wiswedel, KNIME AG, Zurich, Switzerland
  * @since 2.9
  */
@@ -124,7 +137,9 @@ public abstract class NodeFactoryClassMapper {
                     LOGGER.error("Extension " + decl + " ignored.");
                 }
             }
-            resultList.add(instance);
+            if (instance != null) { // We do not want to add invalid NodeFactoryClassMappers to this list.
+                resultList.add(instance);
+            }
         }
         return Collections.unmodifiableList(resultList);
 

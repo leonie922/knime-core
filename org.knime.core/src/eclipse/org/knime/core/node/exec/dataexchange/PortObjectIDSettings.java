@@ -48,11 +48,12 @@
  */
 package org.knime.core.node.exec.dataexchange;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.knime.core.node.FSConnectionFlowVariableProvider;
 import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
@@ -61,8 +62,8 @@ import org.knime.core.node.workflow.CredentialsProvider;
 import org.knime.core.node.workflow.CredentialsStore;
 import org.knime.core.node.workflow.FlowVariable;
 import org.knime.core.node.workflow.ICredentials;
+import org.knime.core.node.workflow.NodeID.NodeIDSuffix;
 import org.knime.core.node.workflow.VariableType.CredentialsType;
-import org.knime.core.node.workflow.VariableType.FSConnectionType;
 
 /**
  * Settings helper that reads/writes the port object ID that is used by the {@link PortObjectRepository}.
@@ -73,11 +74,41 @@ import org.knime.core.node.workflow.VariableType.FSConnectionType;
  */
 public final class PortObjectIDSettings {
 
+    private ReferenceType m_refType;
+
+    // repo ref type details
     private Integer m_id;
+
+    // node ref type details
+    private NodeIDSuffix m_nodeIDSuffix;
+    private int m_portIdx;
+
+    // file ref type details
+    private URI m_uri;
+    private boolean m_isTable;
+
     private List<FlowVariable> m_flowVariables;
     private boolean m_copyData;
     private CredentialsProvider m_credentialsProvider;
-    private FSConnectionFlowVariableProvider m_fsConnectionsProvider;
+
+    /**
+     * Type that determines how the port object is referenced.
+     */
+    // TODO we might decide to delete this when implementing AP-13335
+    public static enum ReferenceType {
+            /**
+             * Reference via the {@link PortObjectRepository} and an ID.
+             */
+            REPOSITORY,
+            /**
+             * Reference to a node (node ID suffix and port idx) in the same workflow.
+             */
+            NODE,
+            /**
+             * Reference to a file given by a URI.
+             */
+            FILE;
+    }
 
     /** Constructor, which sets a null ID (no id). */
     public PortObjectIDSettings() {
@@ -90,7 +121,29 @@ public final class PortObjectIDSettings {
      */
     public void loadSettings(final NodeSettingsRO settings)
         throws InvalidSettingsException {
-        m_id = settings.getInt("portobject_ID");
+        m_refType = ReferenceType.valueOf(settings.getString("referenceType", ReferenceType.REPOSITORY.toString()));
+        switch (m_refType) {
+            case REPOSITORY:
+                m_id = settings.getInt("portobject_ID");
+                break;
+            case NODE:
+                try {
+                    m_nodeIDSuffix = NodeIDSuffix.fromString(settings.getString("node_ID_suffix"));
+                } catch (IllegalArgumentException ex1) {
+                    throw new InvalidSettingsException(ex1);
+                }
+                m_portIdx = settings.getInt("port_idx");
+                CheckUtils.checkSetting(m_portIdx >= 0, "Port index must be >= 0: %d", m_portIdx);
+                break;
+            case FILE:
+                try {
+                    m_uri = new URI(settings.getString("uri"));
+                } catch (URISyntaxException ex) {
+                    throw new InvalidSettingsException(ex);
+                }
+                m_isTable = settings.getBoolean("is_table");
+                break;
+        }
         m_copyData = settings.getBoolean("copyData");
         m_flowVariables = new ArrayList<FlowVariable>();
         // added for cluster version 1.0.2
@@ -113,8 +166,6 @@ public final class PortObjectIDSettings {
                     final ICredentials credentials = m_credentialsProvider.get(name);
                     v = CredentialsStore.newCredentialsFlowVariable(credentials.getName(), credentials.getLogin(),
                         credentials.getPassword(), false, false);
-                } else if (typeS.equals(FSConnectionType.INSTANCE.getIdentifier())) {
-                    v = m_fsConnectionsProvider.flowVariableFor(name).orElse(null);
                 } else {
                     v = FlowVariable.load(child);
                 }
@@ -127,8 +178,21 @@ public final class PortObjectIDSettings {
     /** Saves the current settings to a NodeSettings object.
      * @param settings To write to. */
     public void saveSettings(final NodeSettingsWO settings) {
-        if (m_id != null) {
-            settings.addInt("portobject_ID", m_id);
+        settings.addString("referenceType", m_refType.toString());
+        switch (m_refType) {
+            case REPOSITORY:
+                if (m_id != null) {
+                    settings.addInt("portobject_ID", m_id);
+                }
+                break;
+            case NODE:
+                settings.addString("node_ID_suffix", m_nodeIDSuffix.toString());
+                settings.addInt("port_idx", m_portIdx);
+                break;
+            case FILE:
+                settings.addString("uri", m_uri.toString());
+                settings.addBoolean("is_table", m_isTable);
+                break;
         }
         settings.addBoolean("copyData", m_copyData);
         NodeSettingsWO sub = settings.addNodeSettings("flowVariables");
@@ -140,7 +204,69 @@ public final class PortObjectIDSettings {
     }
 
     /**
-     * Get the currently set ID or null if none have been set.
+     * Sets the infos required if a port object of another node (in the same workflow) is referenced.
+     *
+     * @param nodeIDSuffix the 'relative' node id to reference
+     * @param portIdx the port index
+     */
+    public void setNodeReference(final NodeIDSuffix nodeIDSuffix, final int portIdx) {
+        m_refType = ReferenceType.NODE;
+        m_nodeIDSuffix = nodeIDSuffix;
+        m_portIdx = portIdx;
+    }
+
+    /**
+     * Sets the info required if a port object file is referenced.
+     *
+     * @param uri the file URI, possibly a knime-url
+     * @param isTable whether the reference port object is a data table or not
+     */
+    public void setFileReference(final URI uri, final boolean isTable) {
+        m_refType = ReferenceType.FILE;
+        m_uri = uri;
+        m_isTable = isTable;
+    }
+
+    /**
+     * @return the type of reference
+     */
+    public ReferenceType getReferenceType() {
+        return m_refType;
+    }
+
+    /**
+     * @return the node ID suffix if reference type {@link ReferenceType#NODE}, otherwise possibly <code>null</code>
+     */
+    public NodeIDSuffix getNodeIDSuffix() {
+        return m_nodeIDSuffix;
+    }
+
+    /**
+     * @return the port index if reference type is {@link ReferenceType#NODE}, otherwise possibly <code>null</code>
+     */
+    public int getPortIdx() {
+        return m_portIdx;
+    }
+
+    /**
+     * @return the file uri if reference type is {@link ReferenceType#FILE}, otherwise possibly <code>null</code>
+     */
+    public URI getUri() {
+        return m_uri;
+    }
+
+    /**
+     * @return whether the referenced file represents a table. NOTE: Only of meaningful, if reference type is
+     *         {@link ReferenceType#FILE}!
+     */
+    public boolean isTable() {
+        return m_isTable;
+    }
+
+    /**
+     * Get the currently set ID or null if none have been set. Only meaningful if reference type is
+     * {@link ReferenceType#REPOSITORY}.
+     *
      * @return the id
      */
     public Integer getId() {
@@ -152,6 +278,7 @@ public final class PortObjectIDSettings {
      * @param id the id to set
      */
     public void setId(final Integer id) {
+        m_refType = ReferenceType.REPOSITORY;
         m_id = id;
     }
 
@@ -191,15 +318,4 @@ public final class PortObjectIDSettings {
     public void setCredentialsProvider(final CredentialsProvider cp) {
         m_credentialsProvider = cp;
     }
-
-    /**
-     * Sets the file system connection flow variable provider to read file system connection flow variables from.
-     * Only required for loading the settings.
-     *
-     * @param provider the file system connection flow variable provider
-     */
-    public void setFSConnectionFlowVariableProvider(final FSConnectionFlowVariableProvider provider) {
-        m_fsConnectionsProvider = provider;
-    }
-
 }

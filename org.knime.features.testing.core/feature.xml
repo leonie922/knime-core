@@ -2,12 +2,13 @@
 <feature
       id="org.knime.features.testing.core"
       label="KNIME Testing Framework"
-      version="4.1.0.qualifier"
+      version="4.2.0.qualifier"
       provider-name="KNIME AG, Zurich, Switzerland"
       plugin="org.knime.testing">
 
    <description>
-      Contains classes and nodes for testing KNIME&apos;s functionality through testing workflows.
+      Contains a framework for writing and running KNIME extension unit and workflow tests.
+Usually this feature is only installed for headless tests inside a build system. In order to create tests install &quot;KNIME Testing Framework UI&quot; instead which includes this feature.
    </description>
 
    <copyright>

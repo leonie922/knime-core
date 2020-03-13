@@ -137,6 +137,8 @@ import org.knime.core.node.NodeSettings;
 import org.knime.core.node.NodeSettingsRO;
 import org.knime.core.node.NodeSettingsWO;
 import org.knime.core.node.workflow.NodeContext;
+import org.knime.core.node.workflow.WorkflowContext;
+import org.knime.core.node.workflow.WorkflowManager;
 import org.knime.core.util.FileUtil;
 import org.knime.core.util.LRUCache;
 import org.knime.core.util.MutableBoolean;
@@ -374,6 +376,25 @@ public class Buffer implements KNIMEStreamConstants {
             }
         }
         ENABLE_LRU = tableCache.equals("LRU");
+    }
+
+    /** See {@link KNIMEConstants#PROPERTY_DISCOURAGE_GC}. */
+    private static final String PROPERTY_DISCOURAGE_GC = KNIMEConstants.PROPERTY_DISCOURAGE_GC;
+
+    private static final boolean DEF_DISCOURAGE_GC = true;
+
+    private static final boolean DISCOURAGE_GC;
+    static {
+        boolean discourageGc = DEF_DISCOURAGE_GC;
+        final String discourageGcString = System.getProperty(PROPERTY_DISCOURAGE_GC);
+        if (discourageGcString != null) {
+            if (discourageGcString.equals("true")) {
+                discourageGc = true;
+            } else if (discourageGcString.equals("false")) {
+                discourageGc = false;
+            }
+        }
+        DISCOURAGE_GC = discourageGc;
     }
 
     /** A cache for holding tables in memory. */
@@ -1595,6 +1616,10 @@ public class Buffer implements KNIMEStreamConstants {
     @SuppressWarnings("resource")
     final synchronized CloseableRowIterator iteratorWithFilter(final TableFilter filter, final ExecutionMonitor exec) {
 
+        if (m_isClearedLock.booleanValue()) {
+            throw new IllegalStateException("Cannot iterate over table: buffer has been cleared.");
+        }
+
         final List<BlobSupportDataRow> list = obtainListFromCacheOrBackIntoMemoryIterator();
         if (list == null) {
 
@@ -1604,7 +1629,8 @@ public class Buffer implements KNIMEStreamConstants {
                 m_useBackIntoMemoryIterator = false;
                 final BackIntoMemoryIterator backIntoMemoryIt = new BackIntoMemoryIterator(iterator(), size());
                 m_backIntoMemoryIteratorRef = new WeakReference<BackIntoMemoryIterator>(backIntoMemoryIt);
-                final CloseableRowIterator listIt = new FromListIterator(backIntoMemoryIt.getList(), backIntoMemoryIt);
+                final CloseableRowIterator listIt =
+                    new FromListIterator(backIntoMemoryIt.getList(), backIntoMemoryIt, exec);
                 return filter == null ? listIt : new FilterDelegateRowIterator(listIt, filter, size(), exec);
             }
 
@@ -1629,7 +1655,8 @@ public class Buffer implements KNIMEStreamConstants {
                     // We never store more than 2^31 rows in memory, therefore it's safe to cast to int.
                     final int fromIndex = (int)Math.min(Integer.MAX_VALUE, filter.getFromRowIndex().orElse(0l));
                     final int toIndex = (int)Math.min(Integer.MAX_VALUE, filter.getToRowIndex().orElse(size() - 1));
-                    final FromListRangeIterator rangeIterator = new FromListRangeIterator(list, fromIndex, toIndex);
+                    final FromListRangeIterator rangeIterator =
+                        new FromListRangeIterator(list, fromIndex, toIndex, exec);
 
                     /**
                      * In a future world (a world of predicates, see AP-11805), the filter might be configured to keep
@@ -1640,22 +1667,22 @@ public class Buffer implements KNIMEStreamConstants {
                      * provided with a copied filter with adjusted from- and toRowIndices.
                      */
                     final TableFilter offsetFilter = new TableFilter.Builder(filter)//
-                            .withFromRowIndex(0)//
-                            .withToRowIndex(toIndex - fromIndex)//
-                            .build();
+                        .withFromRowIndex(0)//
+                        .withToRowIndex(toIndex - fromIndex)//
+                        .build();
                     return new FilterDelegateRowIterator(rangeIterator, offsetFilter, size(), exec);
                 }
 
                 // Case 4: We are currently iterating the table back into memory and want to apply a filter.
                 else {
-                    return new FilterDelegateRowIterator(new FromListIterator(list, backIntoMemoryIt), filter, size(),
-                        exec);
+                    return new FilterDelegateRowIterator(new FromListIterator(list, backIntoMemoryIt, exec), filter,
+                        size(), exec);
                 }
 
             }
 
             // Case 5: We have at least parts of the table in memory and don't want to apply a filter.
-            return new FromListIterator(list, backIntoMemoryIt);
+            return new FromListIterator(list, backIntoMemoryIt, exec);
         }
     }
 
@@ -1983,7 +2010,7 @@ public class Buffer implements KNIMEStreamConstants {
                 + " You can tweak the limit by changing the \""
                 + KNIMEConstants.PROPERTY_MIN_FREE_DISC_SPACE_IN_TEMP_IN_MB + "\" java property.");
         }
-        if (count % MAX_FILES_TO_CREATE_BEFORE_GC == 0) {
+        if (count % MAX_FILES_TO_CREATE_BEFORE_GC == 0 && !DISCOURAGE_GC) {
             LOGGER.debug("created " + count + " files, performing garbage collection to release handles");
             System.gc();
         }
@@ -2106,23 +2133,29 @@ public class Buffer implements KNIMEStreamConstants {
     }
 
     /**
-     * Iterator to be used when all data is kept in a list in memory. It uses access by index and allows to itarate over
-     * a range of rows.
+     * Iterator that reads a range of rows from a list that is weakly-referenced in memory. Should the list be
+     * garbage-collected, the iterator is able to use a fallback that reads rows from disk.
      */
-    private class FromListRangeIterator extends CloseableRowIterator {
+    private abstract class FromListFallBackFromFileIterator extends CloseableRowIterator {
 
-        private final List<BlobSupportDataRow> m_list;
-
-        private int m_nextIndex;
+        private final WeakReference<List<BlobSupportDataRow>> m_listRef;
 
         private final int m_toIndex;
 
-        FromListRangeIterator(final List<BlobSupportDataRow> list, final int fromIndex, final int toIndex) {
+        private final ExecutionMonitor m_exec;
+
+        int m_nextIndex;
+
+        private TableStoreCloseableRowIterator m_fallBackFromFileIterator;
+
+        private FromListFallBackFromFileIterator(final List<BlobSupportDataRow> list, final int fromIndex,
+            final int toIndex, final ExecutionMonitor exec) {
             assert fromIndex >= 0;
             assert toIndex < size();
-            m_list = list;
-            m_nextIndex = fromIndex;
+            m_listRef = new WeakReference<>(list);
             m_toIndex = toIndex;
+            m_exec = exec;
+            m_nextIndex = fromIndex;
         }
 
         @Override
@@ -2130,17 +2163,81 @@ public class Buffer implements KNIMEStreamConstants {
             return m_nextIndex <= m_toIndex;
         }
 
+        void initFallBackFromFileIterator() {
+            m_fallBackFromFileIterator =
+                m_outputReader.iteratorWithFilter(TableFilter.filterRangeOfRows(m_nextIndex, m_toIndex), m_exec);
+            m_fallBackFromFileIterator.setBuffer(Buffer.this);
+        }
+
         @Override
         public DataRow next() {
             if (!hasNext()) {
                 throw new NoSuchElementException("No more rows in buffer");
             }
-            return m_list.get(m_nextIndex++);
+
+            // case 1: list has been garbage-collected; use fallback
+            if (m_fallBackFromFileIterator != null) {
+                m_nextIndex++;
+                return m_fallBackFromFileIterator.next();
+            }
+
+            final List<BlobSupportDataRow> list = m_listRef.get();
+            if (list == null) {
+                initFallBackFromFileIterator();
+                return next();
+            }
+
+            // case 2: list in memory, proceed
+            return nextFromList(list);
         }
+
+        abstract DataRow nextFromList(final List<BlobSupportDataRow> list);
 
         @Override
         public void close() {
             m_nextIndex = (int) size();
+        }
+
+    }
+
+    /**
+     * Iterator to be used when all data is kept in a list in memory. It uses access by index and allows to iterate over
+     * a range of rows.
+     */
+    private final class FromListRangeIterator extends FromListFallBackFromFileIterator {
+
+        private FromListRangeIterator(final List<BlobSupportDataRow> list, final int fromIndex, final int toIndex,
+            final ExecutionMonitor exec) {
+            super(list, fromIndex, toIndex, exec);
+        }
+
+        @Override
+        DataRow nextFromList(final List<BlobSupportDataRow> list) {
+            return list.get(m_nextIndex++);
+        }
+
+    }
+
+    /**
+     * Memory alert listener that will - on memory alert - prevent a FromListIterator to read some table further back
+     * into memory.
+     */
+    private static final class BackIntoMemoryIteratorDropper extends MemoryAlertListener {
+
+        private final WeakReference<FromListIterator> m_iteratorRef;
+
+        BackIntoMemoryIteratorDropper(final FromListIterator iterator) {
+            m_iteratorRef = new WeakReference<>(iterator);
+        }
+
+        @SuppressWarnings("resource")
+        @Override
+        protected boolean memoryAlert(final MemoryAlert alert) {
+            final FromListIterator iterator = m_iteratorRef.get();
+            if (iterator != null) {
+                iterator.dropBackIntoMemoryIterator();
+            }
+            return true;
         }
     }
 
@@ -2150,69 +2247,55 @@ public class Buffer implements KNIMEStreamConstants {
      * may be simultaneously modified while reading (in case the content is fetched from disk and restored in memory).
      * This object is used when all rows fit in memory (no file).
      */
-    private class FromListIterator extends CloseableRowIterator {
+    private final class FromListIterator extends FromListFallBackFromFileIterator {
 
         private BackIntoMemoryIterator m_backIntoMemoryIterator;
 
-        private List<BlobSupportDataRow> m_list;
-
-        // do not use iterator here, see inner class comment
-        private int m_nextIndex = 0;
-
-        FromListIterator(final List<BlobSupportDataRow> list, final BackIntoMemoryIterator backIntoMemoryIterator) {
-            m_list = list;
+        private FromListIterator(final List<BlobSupportDataRow> list,
+            final BackIntoMemoryIterator backIntoMemoryIterator, final ExecutionMonitor exec) {
+            super(list, 0, (int) size() - 1, exec);
             m_backIntoMemoryIterator = backIntoMemoryIterator;
+            MemoryAlertSystem.getInstanceUncollected()
+                .addListener(new BackIntoMemoryIteratorDropper(FromListIterator.this));
         }
 
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public boolean hasNext() {
-            return m_nextIndex < size();
+        private void dropBackIntoMemoryIterator() {
+            m_backIntoMemoryIterator = null;
         }
 
-        /**
-         * {@inheritDoc}
-         */
         @Override
-        public DataRow next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException("No more rows in buffer");
-            }
-
-            Object semaphore = m_backIntoMemoryIterator != null ? m_backIntoMemoryIterator : FromListIterator.this;
+        DataRow nextFromList(final List<BlobSupportDataRow> list) {
+        	final BackIntoMemoryIterator backIntoMemoryIterator = m_backIntoMemoryIterator;
+        	// need to synchronize access to list, as it is potentially modified by the backIntoMemoryIterator
+            final Object semaphore = backIntoMemoryIterator != null ? backIntoMemoryIterator : this;
             synchronized (semaphore) {
-                // need to synchronize access to the list as the list is
-                // potentially modified by the backIntoMemoryIterator
-                if (m_nextIndex < m_list.size()) {
-                    return m_list.get(m_nextIndex++);
+
+                // case 2a: read from memory
+                if (m_nextIndex < list.size()) {
+                    return list.get(m_nextIndex++);
                 }
-                if (m_backIntoMemoryIterator == null) {
-                    throw new InternalError(
-                        "DataRow list contains fewer elements than buffer (" + m_list.size() + " vs. " + size() + ")");
+
+                // a memory alert has caused the reference on the back into memory iterator to be dropped; use fallback
+                if (backIntoMemoryIterator == null) {
+                    initFallBackFromFileIterator();
+                    return next();
                 }
-                BlobSupportDataRow next = (BlobSupportDataRow)m_backIntoMemoryIterator.next();
+
+                // case 2b: read from file back into memory
+                final BlobSupportDataRow next = (BlobSupportDataRow)backIntoMemoryIterator.next();
                 if (next == null) {
                     throw new InternalError("Unable to restore data row from disk");
                 }
-                m_list.add(next);
+                list.add(next);
                 // once we've read all rows back into memory, ...
                 if (++m_nextIndex >= size()) {
-                    assert !m_backIntoMemoryIterator.hasNext() : "File iterator returns more rows than buffer contains";
+                	assert !backIntoMemoryIterator.hasNext() : "File iterator returns more rows than buffer contains";
                     m_backIntoMemoryIterator = null;
-
-                    m_list = null;
                 }
                 return next;
             }
         }
 
-        /** {@inheritDoc} */
-        @Override
-        public void close() {
-            m_nextIndex = (int)size();
-        }
     }
 
     /**
@@ -2305,7 +2388,7 @@ public class Buffer implements KNIMEStreamConstants {
                 while ((first = m_filesToDeleteList.poll()) != null) {
                     String type = first.isFile() ? "file" : "directory";
                     boolean deleted = deleteRecursively(first);
-                    if (!deleted && first.exists()) {
+                    if (!deleted && first.exists() && !DISCOURAGE_GC) {
                         // note: although all input streams are closed, the
                         // file can't be deleted. If we call the gc, it
                         // works. No clue. That only happens on windows!
@@ -2622,6 +2705,8 @@ public class Buffer implements KNIMEStreamConstants {
         public void onClear() {
             assert Thread.holdsLock(Buffer.this);
 
+            performClear();
+
             if (m_memoryAlertListener != null) {
                 MemoryAlertSystem.getInstanceUncollected().removeListener(m_memoryAlertListener);
                 m_memoryAlertListener = null;
@@ -2634,8 +2719,6 @@ public class Buffer implements KNIMEStreamConstants {
                  * time to check whether the thread has thrown any exceptions, since we're clearing the buffer anyways.
                  */
                 m_asyncAddFuture.cancel(true);
-            } else {
-                performClear();
             }
 
             m_asyncAddFuture = null;
@@ -2729,9 +2812,26 @@ public class Buffer implements KNIMEStreamConstants {
             try {
                 Buffer buffer = m_bufferRef.get();
                 if (buffer == null) {
+                    LOGGER.debug("Attempting to swap a Buffer that was already garbage collected ... will ignore.");
                     /** Buffer was already discarded (no rows added) */
                     return null;
                 }
+                // START debug AP-13181 buffers not being cleared when workflow is closed and cleaned up
+                if (m_nodeContext != null) {
+                    final WorkflowManager wfm = m_nodeContext.getWorkflowManager();
+                    if (wfm != null) {
+                        final WorkflowContext workflowContext = wfm.getContext();
+                        if (workflowContext != null) {
+                            final File tempLocation = workflowContext.getTempLocation();
+                            if (!tempLocation.isDirectory()) {
+                                throw new IOException(
+                                    "Workflow temp directory " + tempLocation.toString() + " has been deleted.");
+                            }
+                        }
+                    }
+                }
+                // END debug AP-13181 buffers not being cleared when workflow is closed and cleaned up
+
                 buffer.ensureWriterIsOpen();
                 final List<BlobSupportDataRow> list = CACHE.getSilent(buffer).get();
                 final AbstractTableStoreWriter outputWriter = buffer.m_outputWriter;
@@ -2753,8 +2853,11 @@ public class Buffer implements KNIMEStreamConstants {
                     /** Buffer was already discarded */
                     return null;
                 }
-                buffer.closeWriterAndWriteMeta();
-                buffer.m_lifecycle.onWriteSuccessful();
+                /** Prevent asynchronous clearing of buffer during close. */
+                synchronized (buffer.m_isClearedLock) {
+                    buffer.closeWriterAndWriteMeta();
+                    buffer.m_lifecycle.onWriteSuccessful();
+                }
                 buffer = null;
 
             } catch (Throwable t) {
@@ -2773,32 +2876,17 @@ public class Buffer implements KNIMEStreamConstants {
                             LOGGER.error("Table will be held in memory until node is cleared.");
                             LOGGER.error("Workflow can't be saved in this state.");
 
-                            error.append(". Workflow can't be saved until node is cleared.");
+                            // START debug AP-13181 buffers not being cleared when workflow is closed and cleaned up
+                            LOGGER.debugWithFormat("Buffer stack trace at construction time:\n%s",
+                                buffer.m_fullStackTraceAtConstructionTime);
+                            // END debug AP-13181 buffers not being cleared when workflow is closed and cleaned up
+
                             throw new IOException(error.toString(), t);
                         }
                     }
                 }
 
             } finally {
-                if (Thread.currentThread().isInterrupted()) {
-                    /**
-                     * Thread was interrupted due to invocation of clear() on the buffer. The buffer reference should
-                     * therefore not have been cleared and we may get that reference to run performClear and terminate
-                     * gracefully.
-                     */
-                    final Buffer buffer = m_bufferRef.get();
-                    if (buffer != null) {
-                        try {
-                            buffer.performClear();
-                        } catch (Throwable t) {
-                            final StringBuilder error = new StringBuilder();
-                            error.append("Clearing of table");
-                            appendNodeNameAndError(t, error);
-
-                            LOGGER.debug(error.toString(), t);
-                        }
-                    }
-                }
                 NodeContext.removeLastContext();
             }
 
@@ -2809,6 +2897,9 @@ public class Buffer implements KNIMEStreamConstants {
             Optional.ofNullable(m_nodeContext)//
                 .map(NodeContext::getNodeContainer)//
                 .ifPresent(c -> error.append(" at node ").append(c.getNameWithID()));
+            Optional.ofNullable(m_nodeContext)//
+                .map(NodeContext::getWorkflowManager)//
+                .ifPresent(w -> error.append(" at workflow ").append(w.getNameWithID()));
             error.append(" encountered error: ");
             error.append(t.getClass().getSimpleName());
             if (t.getMessage() != null) {

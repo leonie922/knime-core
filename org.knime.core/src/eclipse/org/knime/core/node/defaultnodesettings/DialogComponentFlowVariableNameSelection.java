@@ -71,7 +71,9 @@ import org.knime.core.node.workflow.FlowVariable;
  *
  * @author Kilian Thiel, KNIME.com, Berlin, Germany
  * @since 2.8
+ * @deprecated use {@link DialogComponentFlowVariableNameSelection2} instead
  */
+@Deprecated
 public final class DialogComponentFlowVariableNameSelection extends DialogComponent {
 
     private JComboBox m_jcombobox;

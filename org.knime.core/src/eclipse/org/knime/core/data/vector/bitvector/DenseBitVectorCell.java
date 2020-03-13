@@ -59,6 +59,7 @@ import org.knime.core.data.DataCellSerializer;
 import org.knime.core.data.DataType;
 import org.knime.core.data.DataTypeRegistry;
 import org.knime.core.data.DataValue;
+import org.knime.core.data.convert.DataCellFactoryMethod;
 
 /**
  * Stores Zeros and Ones in a vector, i.e. with fixed positions. The vector has a fixed length. <br>
@@ -236,6 +237,7 @@ public class DenseBitVectorCell extends DataCell implements BitVectorValue {
          * {@inheritDoc}
          */
         @Override
+        @DataCellFactoryMethod(name = "String (Binary\u2192Dense)")
         public DataCell createCell(final String input) {
             BigInteger big = new BigInteger(input, 2);
             return new DenseBitVectorCell(new DenseBitVector(big.toString(16)));
